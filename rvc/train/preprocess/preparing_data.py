@@ -7,6 +7,7 @@ import warnings
 import numpy as np
 import soundfile as sf
 import torch
+from torch import nn
 from tqdm import tqdm
 from transformers import HubertModel
 
@@ -19,6 +20,7 @@ from rvc.train.preprocess.preparing_files import generate_config, generate_filel
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("numba").setLevel(logging.WARNING)
+logging.getLogger("transformers").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
