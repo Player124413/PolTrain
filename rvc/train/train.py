@@ -18,6 +18,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
+# Настройка окружения
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["USE_LIBUV"] = "0" if sys.platform == "win32" else "1"
 
@@ -29,8 +30,7 @@ logging.getLogger("numexpr").setLevel(logging.WARNING)
 logging.getLogger("pytorch_lightning").setLevel(logging.WARNING)
 
 # Подавление предупреждений
-warnings.filterwarnings("ignore", category=FutureWarning)
-warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore")
 
 sys.path.append(os.path.join(os.getcwd()))
 from rvc.lib.algorithm.commons import grad_norm, slice_segments
