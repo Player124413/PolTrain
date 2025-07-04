@@ -4,11 +4,11 @@ import sys
 import traceback
 import warnings
 
-import fairseq
 import numpy as np
 import soundfile as sf
 import torch
 from tqdm import tqdm
+from transformers import HubertModel
 
 sys.path.append(os.getcwd())
 
@@ -19,7 +19,6 @@ from rvc.train.preprocess.preparing_files import generate_config, generate_filel
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("numba").setLevel(logging.WARNING)
-logging.getLogger("fairseq").setLevel(logging.WARNING)
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -29,6 +28,12 @@ sample_rate = int(sys.argv[3])  # Частота дискретизации
 include_mutes = int(sys.argv[4])  # Количество мьют файлов
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+class HubertModelWithFinalProj(HubertModel):
+    def __init__(self, config):
+        super().__init__(config)
+        self.final_proj = nn.Linear(config.hidden_size, config.classifier_proj_size)
 
 
 class DataPreprocessor:
@@ -48,15 +53,7 @@ class DataPreprocessor:
 
     def _load_hubert_model(self):
         """Загрузка модели HuBERT"""
-        model_path = "assets/hubert/hubert_base.pt"
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(
-                f"Error: HuBERT model not found at {model_path}, "
-                "download it from https://huggingface.co/lj1995/VoiceConversionWebUI/tree/main"
-            )
-
-        models, _, _ = fairseq.checkpoint_utils.load_model_ensemble_and_task([model_path], suffix="")
-        model = models[0].to(device).eval()
+        model = HubertModelWithFinalProj.from_pretrained("assets/hubert").to(device).eval()
         return model
 
     def compute_f0(self, path, f0_method):
@@ -90,11 +87,10 @@ class DataPreprocessor:
     def extract_features(self, wav_path):
         """Извлечение признаков HuBERT"""
         feats = self.read_wave(wav_path)
-        padding_mask = torch.BoolTensor(feats.shape).fill_(False)
 
         with torch.no_grad():
-            logits = self.hubert_model.extract_features(source=feats.to(device), padding_mask=padding_mask.to(device), output_layer=12)
-            return logits[0].squeeze(0).float().cpu().numpy()
+            output = self.hubert_model(input_values=feats.to(device))
+            return output.last_hidden_state.squeeze(0).float().cpu().numpy()
 
     def process_files(self):
         """Основной метод обработки файлов"""
