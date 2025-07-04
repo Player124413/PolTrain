@@ -1,23 +1,20 @@
 import os
-import subprocess
 import sys
+import wget
 
 assets_folder = sys.argv[1]
 embedder_name = sys.argv[2]
 
 os.makedirs(assets_folder, exist_ok=True)
 
-hugg_link = "https://huggingface.co/Politrees/RVC_resources/resolve/main"
-file_links = {
-    "rmvpe/rmvpe.pt": f"{hugg_link}/predictors/rmvpe.pt",
-    "hubert/config.json": f"{hugg_link}/embedders/transformers/{embedder_name}/config.json",
-    "hubert/pytorch_model.bin": f"{hugg_link}/embedders/transformers/{embedder_name}/pytorch_model.bin",
+repo_url = "https://huggingface.co/Politrees/RVC_resources/resolve/main"
+file_urls = {
+    "rmvpe/rmvpe.pt": f"{repo_url}/predictors/rmvpe.pt",
+    "hubert/config.json": f"{repo_url}/embedders/transformers/{embedder_name}/config.json",
+    "hubert/pytorch_model.bin": f"{repo_url}/embedders/transformers/{embedder_name}/pytorch_model.bin",
 }
 
-for file, link in file_links.items():
+for file, url in file_urls.items():
     file_path = os.path.join(assets_folder, file)
     if not os.path.exists(file_path):
-        try:
-            subprocess.run(["wget", "-O", file_path, link], check=True)
-        except subprocess.CalledProcessError as e:
-            print(f"Ошибка установки {file}: {e}")
+        wget.download(url, out=file_path)
