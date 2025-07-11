@@ -50,7 +50,7 @@ class DataPreprocessor:
     def _load_hubert_model(self):
         """Загрузка модели HuBERT"""
         model_path = "assets/hubert/hubert_base.pt"
-        models = load_model(model_path).to(device).eval()
+        model = load_model(model_path).to(device).eval()
         return model
 
     def compute_f0(self, path, f0_method):
