@@ -1,27 +1,28 @@
-import logging
 import os
+import logging
+import warnings
+
+# Настройка окружения
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
+# Настройка логирования и подавление предупреждений
+logging.basicConfig(level=logging.WARNING)
+warnings.filterwarnings("ignore")
+
 import sys
 import traceback
-import warnings
 from random import shuffle
 
-import fairseq
 import numpy as np
 import soundfile as sf
 import torch
 from tqdm import tqdm
 
 sys.path.append(os.getcwd())
-
 from rvc.lib.audio import load_audio
+from rvc.lib.fairseq import load_model
 from rvc.lib.rmvpe import RMVPE
-
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-logging.getLogger("numba").setLevel(logging.WARNING)
-logging.getLogger("fairseq").setLevel(logging.WARNING)
-warnings.filterwarnings("ignore", category=FutureWarning)
-warnings.filterwarnings("ignore", category=UserWarning)
 
 exp_dir = str(sys.argv[1])  # Директория с данными
 f0_method = str(sys.argv[2])  # Метод извлечения F0
@@ -49,14 +50,7 @@ class DataPreprocessor:
     def _load_hubert_model(self):
         """Загрузка модели HuBERT"""
         model_path = "assets/hubert/hubert_base.pt"
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(
-                f"Error: HuBERT model not found at {model_path}, "
-                "download it from https://huggingface.co/lj1995/VoiceConversionWebUI/tree/main"
-            )
-
-        models, _, _ = fairseq.checkpoint_utils.load_model_ensemble_and_task([model_path], suffix="")
-        model = models[0].to(device).eval()
+        models = load_model(model_path).to(device).eval()
         return model
 
     def compute_f0(self, path, f0_method):
