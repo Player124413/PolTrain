@@ -9,8 +9,9 @@ os.makedirs(assets_folder, exist_ok=True)
 
 hugg_link = "https://huggingface.co/Politrees/RVC_resources/resolve/main"
 file_links = {
-    "rmvpe/rmvpe.pt": f"{hugg_link}/predictors/rmvpe.pt",
-    "hubert/hubert_base.pt": f"{hugg_link}/embedders/{embedder_name}.pt",
+    "predictors/djcm.pt": f"{hugg_link}/predictors/djcm.pt",
+    "predictors/rmvpe.pt": f"{hugg_link}/predictors/rmvpe.pt",
+    "embedder/hubert_base.pt": f"{hugg_link}/embedders/{embedder_name}.pt",
 }
 
 for file, link in file_links.items():

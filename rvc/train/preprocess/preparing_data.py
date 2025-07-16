@@ -14,7 +14,8 @@ from tqdm import tqdm
 sys.path.append(os.getcwd())
 
 from rvc.lib.audio import load_audio
-from rvc.lib.rmvpe import RMVPE
+from rvc.lib.predictors.DJCM import DJCMF0Predictor
+from rvc.lib.predictors.RMVPE import RMVPEF0Predictor
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
@@ -43,26 +44,22 @@ class DataPreprocessor:
         self.f0_mel_max = 1127 * np.log(1 + self.f0_max / 700)
 
         # Инициализация моделей
-        self.model_rmvpe = RMVPE("assets/rmvpe/rmvpe.pt", "cuda")
+        self.model_djcm = DJCMF0Predictor("assets/predictors/djcm.pt", "cuda")
+        self.model_rmvpe = RMVPEF0Predictor("assets/predictors/rmvpe.pt", "cuda")
         self.hubert_model = self._load_hubert_model()
 
     def _load_hubert_model(self):
         """Загрузка модели HuBERT"""
-        model_path = "assets/hubert/hubert_base.pt"
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(
-                f"Error: HuBERT model not found at {model_path}, "
-                "download it from https://huggingface.co/lj1995/VoiceConversionWebUI/tree/main"
-            )
-
+        model_path = "assets/embedder/hubert_base.pt"
         models, _, _ = fairseq.checkpoint_utils.load_model_ensemble_and_task([model_path], suffix="")
-        model = models[0].to(device).eval()
-        return model
+        return models[0].to(device).eval()
 
     def compute_f0(self, path, f0_method):
         """Вычисление F0"""
         audio = load_audio(path, self.sample_rate)
-        if f0_method == "rmvpe":
+        if f0_method == "djcm":
+            return self.model_djcm.infer_from_audio(audio, 0.03)
+        elif f0_method == "rmvpe":
             return self.model_rmvpe.infer_from_audio(audio, 0.03)
         elif f0_method == "rmvpe+":
             return self.model_rmvpe.infer_from_audio_modified(audio, 0.02)
