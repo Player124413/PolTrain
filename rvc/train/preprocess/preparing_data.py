@@ -5,10 +5,11 @@ import traceback
 import warnings
 from random import shuffle
 
-import fairseq
 import numpy as np
 import soundfile as sf
 import torch
+from fairseq.checkpoint_utils import load_model_ensemble_and_task
+from fairseq.data.dictionary import Dictionary
 from tqdm import tqdm
 
 sys.path.append(os.getcwd())
@@ -43,21 +44,15 @@ class DataPreprocessor:
         self.f0_mel_max = 1127 * np.log(1 + self.f0_max / 700)
 
         # Инициализация моделей
-        self.model_rmvpe = RMVPE("assets/rmvpe/rmvpe.pt", "cuda")
+        self.model_rmvpe = RMVPE("rvc/models/predictors/rmvpe.pt", "cuda")
         self.hubert_model = self._load_hubert_model()
 
     def _load_hubert_model(self):
         """Загрузка модели HuBERT"""
-        model_path = "assets/hubert/hubert_base.pt"
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(
-                f"Error: HuBERT model not found at {model_path}, "
-                "download it from https://huggingface.co/lj1995/VoiceConversionWebUI/tree/main"
-            )
-
-        models, _, _ = fairseq.checkpoint_utils.load_model_ensemble_and_task([model_path], suffix="")
-        model = models[0].to(device).eval()
-        return model
+        torch.serialization.add_safe_globals([Dictionary])
+        model_path = "rvc/models/embedders/*.pt"
+        models, _, _ = load_model_ensemble_and_task([model_path], suffix="")
+        return models[0].to(self.device).eval()
 
     def compute_f0(self, path, f0_method):
         """Вычисление F0"""
@@ -159,7 +154,7 @@ class DataPreprocessor:
 
 
 def generate_filelist(model_path: str, sample_rate: int, include_mutes: int = 2):
-    mute_base_path = os.path.join(os.getcwd(), "logs", "mute")
+    mute_base_path = os.path.join(os.getcwd(), "rvc", "train", "preprocess", "mute")
 
     f0_dir, f0nsf_dir = None, None
     gt_wavs_dir = os.path.join(model_path, "data", "sliced_audios")

@@ -32,12 +32,10 @@ sys.path.append(os.path.join(os.getcwd()))
 from rvc.lib.algorithm.commons import grad_norm, slice_segments
 from rvc.lib.algorithm.discriminators import MultiPeriodDiscriminator
 from rvc.lib.algorithm.synthesizers import Synthesizer
-from rvc.train.extract.extract_model import extract_model
 from rvc.train.losses import discriminator_loss, feature_loss, generator_loss, kl_loss
-from rvc.train.mel_processing import MultiScaleMelSpectrogramLoss, mel_spectrogram_torch, spec_to_mel_torch
+from rvc.train.mel_processing import MultiScaleMelSpectrogramLoss, mel_spectrogram_torch, spec_to_mel_torch, mel_spectrogram_similarity, plot_spectrogram_to_numpy
 from rvc.train.utils.data_utils import DistributedBucketSampler, TextAudioCollateMultiNSFsid, TextAudioLoaderMultiNSFsid
-from rvc.train.utils.train_utils import HParams, attempt_load_checkpoint_pair, save_checkpoint
-from rvc.train.visualization import mel_spectrogram_similarity, plot_spectrogram_to_numpy
+from rvc.train.utils.train_utils import HParams, attempt_load_checkpoint_pair, extract_model, save_checkpoint
 
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = True
@@ -46,7 +44,7 @@ global_step = 0
 
 
 def generate_config(config_save_path, sample_rate, vocoder):
-    config_path = os.path.join("rvc", "configs", f"{sample_rate}.json")
+    config_path = os.path.join("rvc", "train", "configs", f"{sample_rate}.json")
     if not pathlib.Path(config_save_path).exists():
         with open(config_save_path, "w", encoding="utf-8") as f:
             with open(config_path, "r", encoding="utf-8") as config_file:

@@ -1,6 +1,9 @@
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
-import torch.utils.data
+import torch.nn.functional as F
 from librosa.filters import mel as librosa_mel_fn
+from matplotlib.colors import Normalize
 
 
 def dynamic_range_compression_torch(x, C=1, clip_val=1e-5):
@@ -30,7 +33,7 @@ def spectrogram_torch(y, n_fft, hop_size, win_size, center=False):
     if wnsize_dtype_device not in hann_window:
         hann_window[wnsize_dtype_device] = torch.hann_window(win_size).to(dtype=y.dtype, device=y.device)
 
-    y = torch.nn.functional.pad(y.unsqueeze(1), (int((n_fft - hop_size) / 2), int((n_fft - hop_size) / 2)), mode="reflect")
+    y = F.pad(y.unsqueeze(1), (int((n_fft - hop_size) / 2), int((n_fft - hop_size) / 2)), mode="reflect")
     y = y.squeeze(1)
 
     spec = torch.stft(
@@ -129,3 +132,34 @@ class MultiScaleMelSpectrogramLoss(torch.nn.Module):
             fake_logmels = torch.log(fake_mels.clamp(min=1e-5)) / self.log_base
             loss += self.loss_fn(real_logmels, fake_logmels)
         return loss
+
+
+def plot_spectrogram_to_numpy(spectrogram, figsize=(10, 4), cmap="viridis"):
+    """Визуализация Mel-спектрограммы."""
+    fig, ax = plt.subplots(figsize=figsize)
+    im = ax.imshow(spectrogram, aspect="auto", origin="lower", cmap=cmap, norm=Normalize(vmin=-10, vmax=0))
+    plt.colorbar(im, ax=ax, format="%+2.0f dB")
+    plt.xlabel("Кадры")
+    plt.ylabel("Частотные каналы")
+    plt.tight_layout()
+
+    fig.canvas.draw()
+    buf = fig.canvas.buffer_rgba()
+    data = np.asarray(buf, dtype=np.uint8)
+    plt.close(fig)
+    return data
+
+
+def mel_spectrogram_similarity(y_hat_mel, y_mel):
+    """Сходство между сгенерированной и реальной мел-спектрограммами"""
+    device = y_hat_mel.device
+    y_mel = y_mel.to(device)
+
+    if y_hat_mel.shape != y_mel.shape:
+        trimmed_shape = tuple(min(dim_a, dim_b) for dim_a, dim_b in zip(y_hat_mel.shape, y_mel.shape))
+        y_hat_mel = y_hat_mel[..., : trimmed_shape[-1]]
+        y_mel = y_mel[..., : trimmed_shape[-1]]
+
+    loss_mel = F.l1_loss(y_hat_mel, y_mel)
+    mel_spec_similarity = 100.0 - (loss_mel * 100.0)
+    return mel_spec_similarity.clamp(0.0, 100.0)
