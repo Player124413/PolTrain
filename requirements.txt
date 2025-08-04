@@ -1,19 +1,16 @@
 # Звук
-pydub==0.25.1
-librosa==0.11.0
-ffmpeg-python==0.2.0
+librosa
 
 # Визуализация
 tqdm
 tensorboard
-tensorboardX
-matplotlib==3.10.1
-matplotlib-inline==0.1.7
+matplotlib
 
 # Машинное обучение
 torch
 torchaudio
 torchvision
-faiss-cpu==1.10.0
+
+faiss-cpu
 fairseq; python_version < '3.11'
 https://github.com/Politrees/PolTrain/releases/download/fixed-packages/fairseq-0.12.3-cp311-cp311-linux_x86_64.whl; python_version == '3.11'
