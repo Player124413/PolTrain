@@ -25,15 +25,16 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
 exp_dir = str(sys.argv[1])  # Директория с данными
-f0_method = str(sys.argv[2])  # Метод извлечения F0
-sample_rate = int(sys.argv[3])  # Частота дискретизации
-include_mutes = int(sys.argv[4])  # Количество мьют файлов
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
+embedder = str(sys.argv[2])  # Модель эмбеддера
+f0_method = str(sys.argv[3])  # Метод извлечения F0
+sample_rate = int(sys.argv[4])  # Частота дискретизации
+include_mutes = int(sys.argv[5])  # Количество мьют файлов
 
 
 class DataPreprocessor:
     def __init__(self):
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
         # Настройки для F0
         self.sample_rate = 16000
         self.hop_size = 160
@@ -44,13 +45,13 @@ class DataPreprocessor:
         self.f0_mel_max = 1127 * np.log(1 + self.f0_max / 700)
 
         # Инициализация моделей
-        self.model_rmvpe = RMVPE("rvc/models/predictors/rmvpe.pt", "cuda")
+        self.model_rmvpe = RMVPE(os.path.join(os.getcwd(), "rvc", "models", "predictors", "rmvpe.pt"), "cuda")
         self.hubert_model = self._load_hubert_model()
 
     def _load_hubert_model(self):
         """Загрузка модели HuBERT"""
         torch.serialization.add_safe_globals([Dictionary])
-        model_path = "rvc/models/embedders/*.pt"
+        model_path = os.path.join(os.getcwd(), "rvc", "models", "embedders", embedder)
         models, _, _ = load_model_ensemble_and_task([model_path], suffix="")
         return models[0].to(self.device).eval()
 
@@ -88,7 +89,9 @@ class DataPreprocessor:
         padding_mask = torch.BoolTensor(feats.shape).fill_(False)
 
         with torch.no_grad():
-            logits = self.hubert_model.extract_features(source=feats.to(device), padding_mask=padding_mask.to(device), output_layer=12)
+            logits = self.hubert_model.extract_features(
+                source=feats.to(self.device), padding_mask=padding_mask.to(self.device), output_layer=12
+            )
             return logits[0].squeeze(0).float().cpu().numpy()
 
     def process_files(self):

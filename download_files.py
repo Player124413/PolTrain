@@ -43,7 +43,14 @@ def check_and_install_models(embedder_name):
         for model in predictors_names:
             dl_model(PREDICTORS, model, PREDICTORS_DIR)
 
-        embedder_names = [f"{embedder_name}.pt"]
+        embedder_names = [
+            "hubert_base.pt",
+            "contentvec_base.pt",
+            "chinese_hubert_base.pt",
+            "japanese_hubert_base.pt",
+            "korean_hubert_base.pt",
+            "portuguese_hubert_base.pt"
+        ]
         for model in embedder_names:
             dl_model(EMBEDDERS, model, EMBEDDERS_DIR)
 
@@ -54,4 +61,4 @@ def check_and_install_models(embedder_name):
 
 
 if __name__ == "__main__":
-    check_and_install_models(sys.argv[1])
+    check_and_install_models()
