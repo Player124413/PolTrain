@@ -43,8 +43,9 @@ torch.backends.cudnn.benchmark = True
 global_step = 0
 
 
-def generate_config(config_save_path, sample_rate, vocoder):
-    config_path = os.path.join("rvc", "train", "configs", f"{sample_rate}.json")
+def generate_config(config_save_path, sample_rate, vocoder, exp_config):
+    config_name = f"{sample_rate}.json" if not exp_config else f"{sample_rate}_exp.json"
+    config_path = os.path.join("rvc", "train", "configs", config_name)
     if not pathlib.Path(config_save_path).exists():
         with open(config_save_path, "w", encoding="utf-8") as f:
             with open(config_path, "r", encoding="utf-8") as config_file:
@@ -67,6 +68,7 @@ def get_hparams():
     parser.add_argument("--gpus", type=str, default="0")
     parser.add_argument("--save_to_zip", type=lambda x: bool(strtobool(x)), choices=[True, False], default=False)
     parser.add_argument("--save_backup", type=lambda x: bool(strtobool(x)), choices=[True, False], default=False)
+    parser.add_argument("--exp_config", type=lambda x: bool(strtobool(x)), choices=[True, False], default=False)
     args = parser.parse_args()
 
     experiment_dir = os.path.join(args.experiment_dir, args.model_name)
@@ -74,7 +76,7 @@ def get_hparams():
 
     # Генерация файла конфигурации
     if not os.path.exists(config_save_path):
-        generate_config(config_save_path, args.sample_rate, args.vocoder)
+        generate_config(config_save_path, args.sample_rate, args.vocoder, args.exp_config)
 
     # Загрузка файла конфигурации
     with open(config_save_path, "r", encoding="utf-8") as f:
