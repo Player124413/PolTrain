@@ -37,7 +37,7 @@ def dl_model(link, model_name, dir_name):
             bar.update(len(chunk))
 
 
-def check_and_install_models(embedder_name):
+def check_and_install_models():
     try:
         predictors_names = ["rmvpe.pt"]
         for model in predictors_names:
