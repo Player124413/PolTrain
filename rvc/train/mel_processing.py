@@ -80,7 +80,14 @@ def compute_window_length(n_mels: int, sample_rate: int):
 
 
 class MultiScaleMelSpectrogramLoss(torch.nn.Module):
-    def __init__(self, sample_rate: int = 24000, n_mels: list[int] = [5, 10, 20, 40, 80, 160, 320, 480], loss_fn=torch.nn.L1Loss()):
+
+    def __init__(
+        self,
+        sample_rate: int = 24000,
+        n_mels: list[int] = [5, 10, 20, 40, 80, 160, 320],  # , 480],
+        window_lengths: list[int] = [32, 64, 128, 256, 512, 1024, 2048],  # , 4096],
+        loss_fn=torch.nn.L1Loss(),
+    ):
         super().__init__()
         self.sample_rate = sample_rate
         self.loss_fn = loss_fn
@@ -88,9 +95,10 @@ class MultiScaleMelSpectrogramLoss(torch.nn.Module):
         self.stft_params: list[tuple] = []
         self.hann_window: dict[int, torch.Tensor] = {}
         self.mel_banks: dict[int, torch.Tensor] = {}
-        self.stft_params = [(mel, compute_window_length(mel, sample_rate), self.sample_rate // 100) for mel in n_mels]
 
-    def mel_spectrogram(self, wav: torch.Tensor, n_mels: int, window_length: int, hop_length: int):
+        self.stft_params = [(mel, win) for mel, win in zip(n_mels, window_lengths)]
+
+    def mel_spectrogram(self, wav: torch.Tensor, n_mels: int, window_length: int):
         dtype_device = str(wav.dtype) + "_" + str(wav.device)
         win_dtype_device = str(window_length) + "_" + dtype_device
         mel_dtype_device = str(n_mels) + "_" + dtype_device
@@ -102,7 +110,7 @@ class MultiScaleMelSpectrogramLoss(torch.nn.Module):
         stft = torch.stft(
             wav.float(),
             n_fft=window_length,
-            hop_length=hop_length,
+            hop_length=window_length // 4,
             window=self.hann_window[win_dtype_device],
             return_complex=True,
         )
