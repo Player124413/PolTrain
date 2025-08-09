@@ -37,8 +37,8 @@ from rvc.train.mel_processing import MultiScaleMelSpectrogramLoss, mel_spectrogr
 from rvc.train.utils.data_utils import DistributedBucketSampler, TextAudioCollateMultiNSFsid, TextAudioLoaderMultiNSFsid
 from rvc.train.utils.train_utils import HParams, attempt_load_checkpoint_pair, extract_model, save_checkpoint
 
-torch.backends.cudnn.deterministic = False
-torch.backends.cudnn.benchmark = True
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 
 global_step = 0
 
