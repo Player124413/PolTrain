@@ -44,12 +44,12 @@ def check_and_install_models():
             dl_model(PREDICTORS, model, PREDICTORS_DIR)
 
         embedder_names = [
-            "hubert_base.pt",
+            # "hubert_base.pt",
             "contentvec_base.pt",
-            "chinese_hubert_base.pt",
-            "japanese_hubert_base.pt",
-            "korean_hubert_base.pt",
-            "portuguese_hubert_base.pt"
+            # "korean_hubert_base.pt",
+            # "chinese_hubert_base.pt",
+            # "japanese_hubert_base.pt",
+            # "portuguese_hubert_base.pt"
         ]
         for model in embedder_names:
             dl_model(EMBEDDERS, model, EMBEDDERS_DIR)
