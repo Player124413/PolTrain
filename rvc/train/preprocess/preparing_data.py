@@ -273,7 +273,7 @@ class DataPreparer:
 
     def prepare_data(self):
         """Основной метод для запуска всего процесса подготовки данных."""
-        print("Старт предобработки датасета...")
+        print("\nСтарт предобработки датасета...\n")
         try:
             # 1. Сегментирование и ресемплинг
             infos = [(os.path.join(self.input_root, name), idx) for idx, name in enumerate(sorted(os.listdir(self.input_root)))]
