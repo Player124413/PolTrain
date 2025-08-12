@@ -8,6 +8,7 @@ torchvision==0.21.0
 librosa
 matplotlib
 tensorboard
+tensorboardX
 
 # Вспомогательные утилиты
 tqdm
