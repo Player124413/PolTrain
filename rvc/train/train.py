@@ -17,7 +17,6 @@ import json
 import pathlib
 from distutils.util import strtobool
 from random import randint
-from time import sleep
 from time import time as ttime
 
 import torch
@@ -114,11 +113,7 @@ def main():
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = str(randint(20000, 55555))
 
-    device = torch.device(
-        "cuda" if torch.cuda.is_available() else 
-        "mps" if torch.backends.mps.is_available() else 
-        "cpu"
-    )
+    device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     gpus = [int(item) for item in hps.gpus.split("-")] if device.type == "cuda" else [0]
     n_gpus = len(gpus)
     if device.type == "cpu":
@@ -212,10 +207,7 @@ def run(hps, rank, n_gpus, device, device_id):
             net_d = DDP(net_d, device_ids=[device_id])
 
         # Загрузка чекпоинтов
-        checkpoint_paths = [
-            ("G_checkpoint.pth", "D_checkpoint.pth"),
-            ("G_checkpoint_backup.pth", "D_checkpoint_backup.pth")
-        ]
+        checkpoint_paths = [("G_checkpoint.pth", "D_checkpoint.pth"), ("G_checkpoint_backup.pth", "D_checkpoint_backup.pth")]
 
         loaded = False
         for g_file, d_file in checkpoint_paths:
