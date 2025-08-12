@@ -17,15 +17,15 @@ import librosa
 import numpy as np
 import soundfile as sf
 import torch
-from fairseq.checkpoint_utils import load_model_ensemble_and_task
-from fairseq.data.dictionary import Dictionary
 from scipy import signal
 from scipy.io import wavfile
 from tqdm import tqdm
 
-sys.path.append(os.getcwd())
+now_dir = os.getcwd()
+sys.path.append(now_dir)
 
 from rvc.lib.audio import load_audio
+from rvc.lib.fairseq import load_model
 from rvc.lib.rmvpe import RMVPE
 from rvc.train.preprocess.slicer import Slicer
 
@@ -90,15 +90,13 @@ class DataPreparer:
         self.f0_mel_max = 1127 * np.log(1 + self.f0_max / 700)
 
         # Инициализация моделей
-        self.model_rmvpe = RMVPE(os.path.join(os.getcwd(), "rvc", "models", "predictors", "rmvpe.pt"), self.device)
+        self.model_rmvpe = RMVPE(os.path.join(now_dir, "rvc", "models", "predictors", "rmvpe.pt"), self.device)
         self.hubert_model = self._load_hubert_model()
 
     def _load_hubert_model(self):
         """Загрузка модели HuBERT."""
-        torch.serialization.add_safe_globals([Dictionary])
-        model_path = os.path.join(os.getcwd(), "rvc", "models", "embedders", self.embedder)
-        models, _, _ = load_model_ensemble_and_task([model_path], suffix="")
-        return models[0].to(self.device).eval()
+        model = load_model(os.path.join(now_dir, "rvc", "models", "embedders", self.embedder)).to(self.device).eval()
+        return model
 
     def _norm_write(self, tmp_audio, idx0, idx1):
         """Нормализация и сохранение аудио."""
@@ -236,7 +234,7 @@ class DataPreparer:
 
     def _generate_filelist(self):
         """Генерация финального списка файлов (filelist.txt)."""
-        mute_base_path = os.path.join(os.getcwd(), "rvc", "train", "preprocess", "mute")
+        mute_base_path = os.path.join(now_dir, "rvc", "train", "preprocess", "mute")
 
         gt_wavs_files = set(name.split(".")[0] for name in os.listdir(self.gt_wavs_dir))
         feature_files = set(name.split(".")[0] for name in os.listdir(self.features_path))

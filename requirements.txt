@@ -1,16 +1,15 @@
-# Звук
+# Основные ML-фреймворки
+numpy<2
+torch==2.6.0+cu124
+torchaudio==2.6.0+cu124
+torchvision==0.21.0+cu124
+
+# Анализ и визуализация
 librosa
-
-# Визуализация
-tqdm
-tensorboard
 matplotlib
+tensorboard
 
-# Машинное обучение
-torch
-torchaudio
-torchvision
-
-faiss-cpu
-fairseq; python_version < '3.11'
-https://github.com/Politrees/PolTrain/releases/download/fixed-packages/fairseq-0.12.3-cp311-cp311-linux_x86_64.whl; python_version == '3.11'
+# Вспомогательные утилиты
+tqdm
+omegaconf
+faiss-cpu==1.7.3
