@@ -1,8 +1,8 @@
 # Основные ML-фреймворки
 numpy<2
-torch==2.6.0+cu124
-torchaudio==2.6.0+cu124
-torchvision==0.21.0+cu124
+torch==2.6.0
+torchaudio==2.6.0
+torchvision==0.21.0
 
 # Анализ и визуализация
 librosa
