@@ -226,13 +226,12 @@ class DataPreparer:
             )
 
         if self.include_mutes > 0:
+            mute_audio_path = os.path.join(mute_base_path, "sliced_audios", f"mute{self.sample_rate}.wav")
+            mute_feature_path = os.path.join(mute_base_path, "features", "mute.npy")
+            mute_f0_path = os.path.join(mute_base_path, "f0_quantized", "mute.wav.npy")
+            mute_f0nsf_path = os.path.join(mute_base_path, "f0_voiced", "mute.wav.npy")
             for sid in sids * self.include_mutes:
-                options.append(
-                    f"{os.path.join(mute_base_path, "sliced_audios", f'mute{self.sample_rate}.wav')}|"
-                    f"{os.path.join(mute_base_path, "features", "mute.npy")}|"
-                    f"{os.path.join(mute_base_path, "f0_quantized", "mute.wav.npy")}|"
-                    f"{os.path.join(mute_base_path, "f0_voiced", "mute.wav.npy")}|{sid}"
-                )
+                options.append(f"{mute_audio_path}|{mute_feature_path}|{mute_f0_path}|{mute_f0nsf_path}|{sid}")
 
         shuffle(options)
         with open(os.path.join(self.exp_dir, "data", "filelist.txt"), "w", encoding="utf-8") as f:
