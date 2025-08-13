@@ -37,8 +37,8 @@ from rvc.train.mel_processing import MultiScaleMelSpectrogramLoss, mel_spectrogr
 from rvc.train.utils.data_utils import DistributedBucketSampler, TextAudioCollateMultiNSFsid, TextAudioLoaderMultiNSFsid
 from rvc.train.utils.train_utils import HParams, attempt_load_checkpoint_pair, extract_model, save_checkpoint
 
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.deterministic = True  # False
+torch.backends.cudnn.benchmark = False  # True
 
 global_step = 0
 
@@ -162,12 +162,11 @@ def run(hps, rank, n_gpus, device_id):
             [50, 100, 200, 300, 400, 500, 600, 700, 800, 900],
             num_replicas=n_gpus,
             rank=rank,
-            shuffle=True,
+            shuffle=False,  # True,
         )
         train_loader = DataLoader(
             train_dataset,
             num_workers=2,  # 4
-            shuffle=False,
             pin_memory=True,
             collate_fn=collate_fn,
             batch_sampler=train_sampler,
