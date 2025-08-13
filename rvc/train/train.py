@@ -144,13 +144,13 @@ def run(hps, rank, n_gpus, device_id):
         writer_eval = SummaryWriter(log_dir=os.path.join(hps.model_dir, "eval")) if rank == 0 else None
         fn_mel_loss = MultiScaleMelSpectrogramLoss(sample_rate=hps.data.sample_rate)
 
-        if n_gpus > 1:
-            dist.init_process_group(
-                backend="nccl",
-                init_method="env://",
-                world_size=n_gpus,
-                rank=rank,
-            )
+        if n_gpus > 1:
+            dist.init_process_group(
+                backend="nccl",
+                init_method="env://",
+                world_size=n_gpus,
+                rank=rank,
+            )
         torch.manual_seed(hps.train.seed)
         torch.cuda.set_device(device_id)
 
