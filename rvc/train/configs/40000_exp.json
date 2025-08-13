@@ -8,7 +8,8 @@
     "lr_decay": 0.9998,
     "segment_size": 16000,
     "c_mel": 45,
-    "c_kl": 1.0
+    "c_kl": 1.0,
+    "precision": "fp32"
   },
   "data": {
     "max_wav_value": 32768.0,

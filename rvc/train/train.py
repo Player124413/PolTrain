@@ -43,7 +43,7 @@ torch.backends.cudnn.benchmark = False
 global_step = 0
 
 
-def generate_config(config_save_path, sample_rate, vocoder, exp_config):
+def generate_config(config_save_path, sample_rate, vocoder, precision, exp_config):
     config_name = f"{sample_rate}.json" if not exp_config else f"{sample_rate}_exp.json"
     config_path = os.path.join("rvc", "train", "configs", config_name)
     if not pathlib.Path(config_save_path).exists():
@@ -51,6 +51,7 @@ def generate_config(config_save_path, sample_rate, vocoder, exp_config):
             with open(config_path, "r", encoding="utf-8") as config_file:
                 config_data = json.load(config_file)
                 config_data["model"]["vocoder"] = vocoder
+                config_data["train"]["precision"] = precision
                 json.dump(config_data, f, ensure_ascii=False, indent=2)
 
 
@@ -63,6 +64,7 @@ def get_hparams():
     parser.add_argument("--batch_size", type=int, choices=range(1, 51), default=8)
     parser.add_argument("--sample_rate", type=int, choices=[32000, 40000, 48000], default=40000)
     parser.add_argument("--vocoder", type=str, choices=["HiFi-GAN", "MRF HiFi-GAN", "RefineGAN"], default="HiFi-GAN")
+    parser.add_argument("--precision", type=str, choices=["fp16", "fp32"], default="fp32")
     parser.add_argument("--pretrain_g", type=str, default=None)
     parser.add_argument("--pretrain_d", type=str, default=None)
     parser.add_argument("--gpus", type=str, default="0")
@@ -76,7 +78,7 @@ def get_hparams():
 
     # Генерация файла конфигурации
     if not os.path.exists(config_save_path):
-        generate_config(config_save_path, args.sample_rate, args.vocoder, args.exp_config)
+        generate_config(config_save_path, args.sample_rate, args.vocoder, args.precision, args.exp_config)
 
     # Загрузка файла конфигурации
     with open(config_save_path, "r", encoding="utf-8") as f:
@@ -212,12 +214,8 @@ def run(hps, rank, n_gpus, device, device_id):
             net_d = DDP(net_d, device_ids=[device_id])
 
         # Загрузка чекпоинтов
-        checkpoint_paths = [
-            ("G_checkpoint.pth", "D_checkpoint.pth"),
-            ("G_checkpoint_backup.pth", "D_checkpoint_backup.pth")
-        ]
-
         loaded = False
+        checkpoint_paths = [("G_checkpoint.pth", "D_checkpoint.pth"), ("G_checkpoint_backup.pth", "D_checkpoint_backup.pth")]
         for g_file, d_file in checkpoint_paths:
             g_path = os.path.join(hps.model_dir, g_file)
             d_path = os.path.join(hps.model_dir, d_file)
@@ -251,6 +249,8 @@ def run(hps, rank, n_gpus, device, device_id):
         scheduler_g = torch.optim.lr_scheduler.ExponentialLR(optim_g, gamma=hps.train.lr_decay, last_epoch=epoch_str - 2)
         scheduler_d = torch.optim.lr_scheduler.ExponentialLR(optim_d, gamma=hps.train.lr_decay, last_epoch=epoch_str - 2)
 
+        scaler = torch.amp.GradScaler("cuda", enabled=True) if hps.train.precision == "fp16" else None
+
         print("\nЗапуск процесса обучения модели...", flush=True)
         for epoch in range(epoch_str, hps.total_epoch + 1):
             train_and_evaluate(
@@ -262,6 +262,7 @@ def run(hps, rank, n_gpus, device, device_id):
                 train_loader,
                 writer_eval,
                 fn_mel_loss,
+                scaler,
                 device,
                 device_id,
             )
@@ -273,7 +274,7 @@ def run(hps, rank, n_gpus, device, device_id):
             dist.destroy_process_group()
 
 
-def train_and_evaluate(hps, rank, epoch, nets, optims, train_loader, writer_eval, fn_mel_loss, device, device_id):
+def train_and_evaluate(hps, rank, epoch, nets, optims, train_loader, writer_eval, fn_mel_loss, scaler, device, device_id):
     global global_step
 
     net_g, net_d = nets
@@ -291,31 +292,50 @@ def train_and_evaluate(hps, rank, epoch, nets, optims, train_loader, writer_eval
             info = [tensor.to(device) for tensor in info]
 
         phone, phone_lengths, pitch, pitchf, spec, spec_lengths, wave, _, sid = info
-        model_output = net_g(phone, phone_lengths, pitch, pitchf, spec, spec_lengths, sid)
-        y_hat, ids_slice, _, z_mask, (_, z_p, m_p, logs_p, _, logs_q) = model_output
-        wave = slice_segments(wave, ids_slice * hps.data.hop_length, hps.train.segment_size, dim=3)
+        
+        with torch.amp.autocast("cuda", enabled=scaler.is_enabled()):
+            model_output = net_g(phone, phone_lengths, pitch, pitchf, spec, spec_lengths, sid)
+            y_hat, ids_slice, _, z_mask, (_, z_p, m_p, logs_p, _, logs_q) = model_output
+            wave = slice_segments(wave, ids_slice * hps.data.hop_length, hps.train.segment_size, dim=3)
 
         # Discriminator loss
         for _ in range(1):  # default x1
-            y_d_hat_r, y_d_hat_g, _, _ = net_d(wave, y_hat.detach())
+            with torch.amp.autocast("cuda", enabled=scaler.is_enabled()):
+                y_d_hat_r, y_d_hat_g, _, _ = net_d(wave, y_hat.detach())
             loss_disc, _, _ = discriminator_loss(y_d_hat_r, y_d_hat_g)
+
             optim_d.zero_grad()
-            loss_disc.backward()
-            grad_norm_d = grad_norm(net_d.parameters())
-            optim_d.step()
+            if scaler is None:
+                loss_disc.backward()
+                grad_norm_d = grad_norm(net_d.parameters())
+                optim_d.step()
+            else:
+                scaler.scale(loss_disc).backward()
+                scaler.unscale_(optim_d)
+                grad_norm_d = grad_norm(net_d.parameters())
+                scaler.step(optim_d)
 
         # Generator loss
         for _ in range(1):  # default x1
-            _, y_d_hat_g, fmap_r, fmap_g = net_d(wave, y_hat)
+            with torch.amp.autocast("cuda", enabled=scaler.is_enabled()):
+                _, y_d_hat_g, fmap_r, fmap_g = net_d(wave, y_hat)
             loss_mel = fn_mel_loss(wave, y_hat) * hps.train.c_mel / 3.0
             loss_kl = kl_loss(z_p, logs_q, m_p, logs_p, z_mask) * hps.train.c_kl
             loss_fm = feature_loss(fmap_r, fmap_g)
             loss_gen, _ = generator_loss(y_d_hat_g)
             loss_gen_all = loss_gen + loss_fm + loss_mel + loss_kl
+
             optim_g.zero_grad()
-            loss_gen_all.backward()
-            grad_norm_g = grad_norm(net_g.parameters())
-            optim_g.step()
+            if scaler is None:
+                loss_gen_all.backward()
+                grad_norm_g = grad_norm(net_g.parameters())
+                optim_g.step()
+            else:
+                scaler.scale(loss_gen_all).backward()
+                scaler.unscale_(optim_g)
+                grad_norm_g = grad_norm(net_g.parameters())
+                scaler.step(optim_g)
+                scaler.update()
 
         # learning rates
         current_lr_d = optim_d.param_groups[0]["lr"]
