@@ -5,7 +5,7 @@ import warnings
 
 # Настройка окружения
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-os.environ["USE_LIBUV"] = "0" if sys.platform == "win32" else "1"
+os.environ["USE_LIBUV"] = "1"
 
 # Настройка логирования и подавление предупреждений
 logging.basicConfig(level=logging.WARNING)
@@ -111,26 +111,23 @@ class EpochRecorder:
 
 
 def main():
-    hps = get_hparams()
+    if not torch.cuda.is_available():
+        print("CUDA-устройство не найдено. Обучение невозможно.", flush=True)
+        sys.exit(1)
 
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = str(randint(20000, 55555))
 
-    device = torch.device(
-        "cuda" if torch.cuda.is_available() else 
-        "mps" if torch.backends.mps.is_available() else 
-        "cpu"
-    )
-    gpus = [int(item) for item in hps.gpus.split("-")] if device.type == "cuda" else [0]
+    hps = get_hparams()
+
+    gpus = [int(item) for item in hps.gpus.split("-")]
     n_gpus = len(gpus)
-    if device.type == "cpu":
-        print("Обучение с использованием процессора займёт много времени.", flush=True)
 
     children = []
     for rank, device_id in enumerate(gpus):
         subproc = mp.Process(
             target=run,
-            args=(hps, rank, n_gpus, device, device_id),
+            args=(hps, rank, n_gpus, device_id),
         )
         children.append(subproc)
         subproc.start()
@@ -141,22 +138,21 @@ def main():
     sys.exit(0)
 
 
-def run(hps, rank, n_gpus, device, device_id):
+def run(hps, rank, n_gpus, device_id):
     global global_step
     try:
         writer_eval = SummaryWriter(log_dir=os.path.join(hps.model_dir, "eval")) if rank == 0 else None
         fn_mel_loss = MultiScaleMelSpectrogramLoss(sample_rate=hps.data.sample_rate)
 
-        dist.init_process_group(
-            backend="gloo" if sys.platform == "win32" or device.type != "cuda" else "nccl",
-            init_method="env://",
-            world_size=n_gpus if device.type == "cuda" else 1,
-            rank=rank if device.type == "cuda" else 0,
-        )
-
+        if n_gpus > 1:
+            dist.init_process_group(
+                backend="nccl",
+                init_method="env://",
+                world_size=n_gpus,
+                rank=rank,
+            )
         torch.manual_seed(hps.train.seed)
-        if torch.cuda.is_available():
-            torch.cuda.set_device(device_id)
+        torch.cuda.set_device(device_id)
 
         collate_fn = TextAudioCollateMultiNSFsid()
         train_dataset = TextAudioLoaderMultiNSFsid(hps.data)
@@ -189,12 +185,8 @@ def run(hps, rank, n_gpus, device, device_id):
         )
         net_d = MultiPeriodDiscriminator(hps.model.use_spectral_norm, checkpointing=False)
 
-        if device.type == "cuda":
-            net_g = net_g.cuda(device_id)
-            net_d = net_d.cuda(device_id)
-        else:
-            net_g = net_g.to(device)
-            net_d = net_d.to(device)
+        net_g = net_g.cuda(device_id)
+        net_d = net_d.cuda(device_id)
 
         optim_g = torch.optim.AdamW(
             net_g.parameters(),
@@ -209,7 +201,7 @@ def run(hps, rank, n_gpus, device, device_id):
             eps=hps.train.eps,
         )
 
-        if n_gpus > 1 and device.type == "cuda":
+        if n_gpus > 1:
             net_g = DDP(net_g, device_ids=[device_id])
             net_d = DDP(net_d, device_ids=[device_id])
 
@@ -263,7 +255,6 @@ def run(hps, rank, n_gpus, device, device_id):
                 writer_eval,
                 fn_mel_loss,
                 scaler,
-                device,
                 device_id,
             )
             scheduler_g.step()
@@ -274,7 +265,7 @@ def run(hps, rank, n_gpus, device, device_id):
             dist.destroy_process_group()
 
 
-def train_and_evaluate(hps, rank, epoch, nets, optims, train_loader, writer_eval, fn_mel_loss, scaler, device, device_id):
+def train_and_evaluate(hps, rank, epoch, nets, optims, train_loader, writer_eval, fn_mel_loss, scaler, device_id):
     global global_step
 
     net_g, net_d = nets
@@ -286,13 +277,9 @@ def train_and_evaluate(hps, rank, epoch, nets, optims, train_loader, writer_eval
 
     epoch_recorder = EpochRecorder()
     for _, info in enumerate(train_loader):
-        if device.type == "cuda":
-            info = [tensor.cuda(device_id, non_blocking=True) for tensor in info]
-        else:
-            info = [tensor.to(device) for tensor in info]
-
+        info = [tensor.cuda(device_id, non_blocking=True) for tensor in info]
         phone, phone_lengths, pitch, pitchf, spec, spec_lengths, wave, _, sid = info
-        
+
         with torch.amp.autocast("cuda", enabled=scaler.is_enabled()):
             model_output = net_g(phone, phone_lengths, pitch, pitchf, spec, spec_lengths, sid)
             y_hat, ids_slice, _, z_mask, (_, z_p, m_p, logs_p, _, logs_q) = model_output
