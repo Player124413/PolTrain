@@ -29,16 +29,6 @@ from rvc.lib.fairseq import load_model
 from rvc.lib.rmvpe import RMVPE
 from rvc.train.preprocess.slicer import Slicer
 
-# Парсинг аргументов командной строки
-exp_dir = str(sys.argv[1])
-input_root = str(sys.argv[2])
-embedder = str(sys.argv[3])
-f0_method = str(sys.argv[4])
-sample_rate = int(sys.argv[5])
-percentage = float(sys.argv[6])
-include_mutes = int(sys.argv[7])
-normalize = sys.argv[8] == "True"
-
 # Константы
 RES_TYPE = "soxr_vhq"
 SAMPLE_RATE_16K = 16000
@@ -57,29 +47,23 @@ class DataPreparer:
         self.percentage = percentage
         self.sample_rate = sample_rate
         self.normalize = normalize
-        self.embedder = embedder
         self.f0_method = f0_method
         self.include_mutes = include_mutes
 
         # Настройка директорий
         self.gt_wavs_dir = os.path.join(exp_dir, "data", "sliced_audios")
         self.wavs16k_dir = os.path.join(exp_dir, "data", "sliced_audios_16k")
-        self.f0_quant_path = os.path.join(exp_dir, "data", "f0_quantized")
-        self.f0_voiced_path = os.path.join(exp_dir, "data", "f0_voiced")
-        self.features_path = os.path.join(exp_dir, "data", "features")
-        os.makedirs(self.gt_wavs_dir, exist_ok=True)
-        os.makedirs(self.wavs16k_dir, exist_ok=True)
-        os.makedirs(self.f0_quant_path, exist_ok=True)
-        os.makedirs(self.f0_voiced_path, exist_ok=True)
-        os.makedirs(self.features_path, exist_ok=True)
-
+        self.f0_quant_dir = os.path.join(exp_dir, "data", "f0_quantized")
+        self.f0_voiced_dir = os.path.join(exp_dir, "data", "f0_voiced")
+        self.features_dir = os.path.join(exp_dir, "data", "features")
+        for path in [self.gt_wavs_dir, self.wavs16k_dir, self.f0_quant_dir, self.f0_voiced_dir, self.features_dir]:
+            os.makedirs(path, exist_ok=True)
+        
         # Параметры сегментирования аудио
         self.slicer = Slicer(sr=sample_rate, threshold=-42, min_length=1500, min_interval=400, hop_size=15, max_sil_kept=500)
         self.b_high, self.a_high = signal.butter(N=5, Wn=48, btype="high", fs=self.sample_rate)
         self.overlap = 0.3
         self.tail = self.percentage + self.overlap
-        self.max_amplitude = 0.9
-        self.alpha = 0.75
 
         # Параметры извлечения признаков
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -91,12 +75,7 @@ class DataPreparer:
 
         # Инициализация моделей
         self.model_rmvpe = RMVPE(os.path.join(now_dir, "rvc", "models", "predictors", "rmvpe.pt"), self.device)
-        self.hubert_model = self._load_hubert_model()
-
-    def _load_hubert_model(self):
-        """Загрузка модели HuBERT."""
-        model = load_model(os.path.join(now_dir, "rvc", "models", "embedders", self.embedder)).to(self.device).eval()
-        return model
+        self.hubert_model = load_model(os.path.join(now_dir, "rvc", "models", "embedders", embedder)).to(self.device).eval()
 
     def _norm_write(self, tmp_audio, idx0, idx1):
         """Нормализация и сохранение аудио."""
@@ -106,7 +85,7 @@ class DataPreparer:
 
         tmp_audio_resampled = librosa.resample(tmp_audio, orig_sr=self.sample_rate, target_sr=self.sample_rate, res_type=RES_TYPE)
         if self.normalize:
-            tmp_audio_resampled = (tmp_audio_resampled / tmp_max * (self.max_amplitude * self.alpha)) + (1 - self.alpha) * tmp_audio_resampled
+            tmp_audio_resampled = (tmp_audio_resampled / tmp_max * (0.9 * 0.75)) + (1 - 0.75) * tmp_audio_resampled
         wavfile.write(f"{self.gt_wavs_dir}/{idx0}_{idx1}.wav", self.sample_rate, tmp_audio_resampled.astype(np.float32))
 
         tmp_audio_16k = librosa.resample(tmp_audio_resampled, orig_sr=self.sample_rate, target_sr=SAMPLE_RATE_16K, res_type=RES_TYPE)
@@ -164,7 +143,7 @@ class DataPreparer:
 
     def _compute_f0(self, path):
         """Вычисление F0."""
-        audio = load_audio(path, SAMPLE_RATE_16K)
+        audio, _ = librosa.load(path, sr=SAMPLE_RATE_16K)
         if self.f0_method == "rmvpe":
             return self.model_rmvpe.infer_from_audio(audio, 0.03)
         elif self.f0_method == "rmvpe+":
@@ -178,24 +157,14 @@ class DataPreparer:
         f0_mel[f0_mel > self.f0_bin - 1] = self.f0_bin - 1
         return np.rint(f0_mel).astype(int)
 
-    def _read_wave(self, wav_path):
-        """Чтение аудиофайла для HuBERT."""
-        wav, sr = sf.read(wav_path)
-        assert sr == SAMPLE_RATE_16K
-        feats = torch.from_numpy(wav).float()
-        if feats.dim() == 2:
-            feats = feats.mean(-1)
-        assert feats.dim() == 1
-        return feats.view(1, -1)
-
     def _extract_features(self, wav_path):
         """Извлечение признаков HuBERT."""
-        feats = self._read_wave(wav_path)
-        padding_mask = torch.BoolTensor(feats.shape).fill_(False)
+        wav, _ = librosa.load(wav_path, sr=SAMPLE_RATE_16K)
+        feats = torch.from_numpy(wav).float().view(1, -1).to(self.device)
+        padding_mask = torch.BoolTensor(feats.shape).fill_(False).to(self.device)
+        
         with torch.no_grad():
-            logits = self.hubert_model.extract_features(
-                source=feats.to(self.device), padding_mask=padding_mask.to(self.device), output_layer=12
-            )
+            logits = self.hubert_model.extract_features(source=feats, padding_mask=padding_mask, output_layer=12)
             return logits[0].squeeze(0).float().cpu().numpy()
 
     def _extract_all_features(self):
@@ -210,8 +179,8 @@ class DataPreparer:
         for file in tqdm(files, desc="Извлечение тона"):
             try:
                 inp_path = f"{inp_root}/{file}"
-                opt_path1 = f"{self.f0_quant_path}/{file}"
-                opt_path2 = f"{self.f0_voiced_path}/{file}"
+                opt_path1 = f"{self.f0_quant_dir}/{file}"
+                opt_path2 = f"{self.f0_voiced_dir}/{file}"
                 if not (os.path.exists(opt_path1 + ".npy") and os.path.exists(opt_path2 + ".npy")):
                     featur_pit = self._compute_f0(inp_path)
                     np.save(opt_path2, featur_pit, allow_pickle=False)
@@ -223,7 +192,7 @@ class DataPreparer:
         for file in tqdm(files, desc="Извлечение признаков"):
             try:
                 wav_path = f"{inp_root}/{file}"
-                out_path = f"{self.features_path}/{file.replace('.wav', '.npy')}"
+                out_path = f"{self.features_dir}/{file.replace('.wav', '.npy')}"
                 if not os.path.exists(out_path):
                     feats = self._extract_features(wav_path)
                     if np.isnan(feats).sum() > 0:
@@ -237,9 +206,9 @@ class DataPreparer:
         mute_base_path = os.path.join(now_dir, "rvc", "train", "preprocess", "mute")
 
         gt_wavs_files = set(name.split(".")[0] for name in os.listdir(self.gt_wavs_dir))
-        feature_files = set(name.split(".")[0] for name in os.listdir(self.features_path))
-        f0_files = set(name.split(".")[0] for name in os.listdir(self.f0_quant_path))
-        f0nsf_files = set(name.split(".")[0] for name in os.listdir(self.f0_voiced_path))
+        feature_files = set(name.split(".")[0] for name in os.listdir(self.features_dir))
+        f0_files = set(name.split(".")[0] for name in os.listdir(self.f0_quant_dir))
+        f0nsf_files = set(name.split(".")[0] for name in os.listdir(self.f0_voiced_dir))
 
         names = gt_wavs_files & feature_files & f0_files & f0nsf_files
 
@@ -251,19 +220,19 @@ class DataPreparer:
                 sids.append(sid)
             options.append(
                 f"{os.path.join(self.gt_wavs_dir, name)}.wav|"
-                f"{os.path.join(self.features_path, name)}.npy|"
-                f"{os.path.join(self.f0_quant_path, name)}.wav.npy|"
-                f"{os.path.join(self.f0_voiced_path, name)}.wav.npy|{sid}"
+                f"{os.path.join(self.features_dir, name)}.npy|"
+                f"{os.path.join(self.f0_quant_dir, name)}.wav.npy|"
+                f"{os.path.join(self.f0_voiced_dir, name)}.wav.npy|{sid}"
             )
 
         if self.include_mutes > 0:
-            mute_audio_path = os.path.join(mute_base_path, "sliced_audios", f"mute{self.sample_rate}.wav")
-            mute_feature_path = os.path.join(mute_base_path, "features", "mute.npy")
-            mute_f0_path = os.path.join(mute_base_path, "f0_quantized", "mute.wav.npy")
-            mute_f0nsf_path = os.path.join(mute_base_path, "f0_voiced", "mute.wav.npy")
-
             for sid in sids * self.include_mutes:
-                options.append(f"{mute_audio_path}|{mute_feature_path}|{mute_f0_path}|{mute_f0nsf_path}|{sid}")
+                options.append(
+                    f"{os.path.join(mute_base_path, "sliced_audios", f"mute{self.sample_rate}.wav")}|"
+                    f"{os.path.join(mute_base_path, "features", "mute.npy")}|"
+                    f"{os.path.join(mute_base_path, "f0_quantized", "mute.wav.npy")}|"
+                    f"{os.path.join(mute_base_path, "f0_voiced", "mute.wav.npy")}|{sid}"
+                )
 
         shuffle(options)
         with open(os.path.join(self.exp_dir, "data", "filelist.txt"), "w", encoding="utf-8") as f:
@@ -293,16 +262,29 @@ class DataPreparer:
         error_message = (
             "ОШИБКА: Не найдено ни одного фрагмента для обработки.\n"
             "Возможные причины:\n"
-            "1. Датасет не имеет звука.\n"
-            "2. Датасет слишком тихий.\n"
-            "3. Датасет слишком короткий (менее 3 секунд).\n"
-            "4. Датасет слишком длинный (более 1 часа одним файлом).\n\n"
-            "Попробуйте увеличить громкость или изменить объем датасета.\n"
-            "Если у вас один большой файл, можно разделить его на несколько более мелких."
+            "1. Датасет не имеет звука или слишком тихий.\n"
+            "2. Датасет слишком короткий (менее 3 секунд).\n"
+            "3. Один из файлов слишком длинный (более 1 часа).\n\n"
+            "РЕШЕНИЯ:\n"
+            "- Если у вас тихие файлы, увеличьте их громкость.\n"
+            "- Если у вас один большой файл, разделите его на несколько частей."
         )
         raise FileNotFoundError(error_message)
 
 
 if __name__ == "__main__":
+    if len(sys.argv) != 9:
+        sys.exit(1)
+
+    # Парсинг аргументов командной строки
+    exp_dir = str(sys.argv[1])
+    input_root = str(sys.argv[2])
+    embedder = str(sys.argv[3])
+    f0_method = str(sys.argv[4])
+    sample_rate = int(sys.argv[5])
+    percentage = float(sys.argv[6])
+    include_mutes = int(sys.argv[7])
+    normalize = sys.argv[8].lower() == "true"
+    
     preparer = DataPreparer(exp_dir, input_root, percentage, sample_rate, normalize, embedder, f0_method, include_mutes)
     preparer.prepare_data()
