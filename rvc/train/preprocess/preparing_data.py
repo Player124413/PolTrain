@@ -228,7 +228,7 @@ class DataPreparer:
         if self.include_mutes > 0:
             for sid in sids * self.include_mutes:
                 options.append(
-                    f"{os.path.join(mute_base_path, "sliced_audios", f"mute{self.sample_rate}.wav")}|"
+                    f"{os.path.join(mute_base_path, "sliced_audios", f'mute{self.sample_rate}.wav')}|"
                     f"{os.path.join(mute_base_path, "features", "mute.npy")}|"
                     f"{os.path.join(mute_base_path, "f0_quantized", "mute.wav.npy")}|"
                     f"{os.path.join(mute_base_path, "f0_voiced", "mute.wav.npy")}|{sid}"
