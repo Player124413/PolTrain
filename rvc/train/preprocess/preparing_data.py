@@ -15,7 +15,6 @@ import time
 from random import shuffle
 import librosa
 import numpy as np
-import soundfile as sf
 import torch
 from scipy import signal
 from scipy.io import wavfile
@@ -58,7 +57,7 @@ class DataPreparer:
         self.features_dir = os.path.join(exp_dir, "data", "features")
         for path in [self.gt_wavs_dir, self.wavs16k_dir, self.f0_quant_dir, self.f0_voiced_dir, self.features_dir]:
             os.makedirs(path, exist_ok=True)
-        
+
         # Параметры сегментирования аудио
         self.slicer = Slicer(sr=sample_rate, threshold=-42, min_length=1500, min_interval=400, hop_size=15, max_sil_kept=500)
         self.b_high, self.a_high = signal.butter(N=5, Wn=48, btype="high", fs=self.sample_rate)
@@ -126,12 +125,12 @@ class DataPreparer:
         manager = multiprocessing.Manager()
         processed_count = manager.Value('i', 0)
         total_files = len(infos)
-        
+
         ps = [multiprocessing.Process(target=self._process_audio_chunk, args=(infos[i::num_processes], processed_count)) for i in range(num_processes)]
-        
+
         for p in ps:
             p.start()
-        
+
         with tqdm(total=total_files, desc="Сегментирование аудиофайлов") as pbar:
             while processed_count.value < total_files:
                 pbar.update(processed_count.value - pbar.n)
@@ -162,7 +161,7 @@ class DataPreparer:
         wav, _ = librosa.load(wav_path, sr=SAMPLE_RATE_16K)
         feats = torch.from_numpy(wav).float().view(1, -1).to(self.device)
         padding_mask = torch.BoolTensor(feats.shape).fill_(False).to(self.device)
-        
+
         with torch.no_grad():
             logits = self.hubert_model.extract_features(source=feats, padding_mask=padding_mask, output_layer=12)
             return logits[0].squeeze(0).float().cpu().numpy()
@@ -186,8 +185,8 @@ class DataPreparer:
                     np.save(opt_path2, featur_pit, allow_pickle=False)
                     coarse_pit = self._coarse_f0(featur_pit)
                     np.save(opt_path1, coarse_pit, allow_pickle=False)
-            except Exception:
-                raise RuntimeError(f"Ошибка извлечения тона!\nФайл - {inp_path}\n{traceback.format_exc()}")
+            except Exception as exc:
+                raise RuntimeError(f"Ошибка извлечения тона!\nФайл - {inp_path}\n{traceback.format_exc()}") from exc
 
         for file in tqdm(files, desc="Извлечение признаков"):
             try:
@@ -198,8 +197,8 @@ class DataPreparer:
                     if np.isnan(feats).sum() > 0:
                         raise TypeError(f"Файл {file} содержит некорректные значения (NaN).")
                     np.save(out_path, feats, allow_pickle=False)
-            except Exception:
-                raise RuntimeError(f"Ошибка извлечения признаков!\nФайл - {wav_path}\n{traceback.format_exc()}")
+            except Exception as exc:
+                raise RuntimeError(f"Ошибка извлечения признаков!\nФайл - {wav_path}\n{traceback.format_exc()}") from exc
 
     def _generate_filelist(self):
         """Генерация финального списка файлов (filelist.txt)."""
@@ -284,6 +283,6 @@ if __name__ == "__main__":
     percentage = float(sys.argv[6])
     include_mutes = int(sys.argv[7])
     normalize = sys.argv[8].lower() == "true"
-    
+
     preparer = DataPreparer(exp_dir, input_root, percentage, sample_rate, normalize, embedder, f0_method, include_mutes)
     preparer.prepare_data()
