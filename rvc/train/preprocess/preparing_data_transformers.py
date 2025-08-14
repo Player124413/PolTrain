@@ -4,7 +4,7 @@ import sys
 import traceback
 import warnings
 from random import shuffle
-
+from torch import nn
 import numpy as np
 import soundfile as sf
 import torch
