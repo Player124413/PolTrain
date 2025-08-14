@@ -7,6 +7,7 @@ from rvc.lib.algorithm.encoders import PosteriorEncoder, TextEncoder
 from rvc.lib.algorithm.generators.hifigan_mrf import HiFiGANMRFGenerator
 from rvc.lib.algorithm.generators.hifigan_nsf import HiFiGANNSFGenerator
 from rvc.lib.algorithm.generators.refinegan import RefineGANGenerator
+from rvc.lib.algorithm.generators.ringformer import RingFormerGenerator
 from rvc.lib.algorithm.residuals import ResidualCouplingBlock
 
 
@@ -101,6 +102,20 @@ class Synthesizer(torch.nn.Module):
                 num_mels=inter_channels,
                 checkpointing=checkpointing,
             )
+        elif vocoder == "RingFormer":
+            self.dec = RingFormerGenerator(
+                initial_channel=inter_channels,
+                resblock_kernel_sizes=resblock_kernel_sizes,
+                resblock_dilation_sizes=resblock_dilation_sizes,
+                upsample_rates=upsample_rates,
+                upsample_initial_channel=upsample_initial_channel,
+                upsample_kernel_sizes=upsample_kernel_sizes,
+                gen_istft_n_fft=gen_istft_n_fft,
+                gen_istft_hop_size=gen_istft_hop_size,
+                gin_channels=gin_channels,
+                sr=sr,
+                checkpointing=checkpointing,
+           )
         else:
             self.dec = HiFiGANNSFGenerator(
                 inter_channels,
