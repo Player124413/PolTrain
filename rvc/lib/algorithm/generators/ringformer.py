@@ -20,7 +20,6 @@ from rvc.lib.algorithm.residuals import ResBlock, ResBlock_Snake, ResBlock_Snake
 from rvc.lib.algorithm.conformer.conformer import Conformer
 
 from rvc.lib.algorithm.commons import init_weights
-from rvc.lib.algorithm.conformer.stft import TorchSTFT
 
 
 
