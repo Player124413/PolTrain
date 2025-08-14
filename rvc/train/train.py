@@ -30,7 +30,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 sys.path.append(os.path.join(os.getcwd()))
 from rvc.lib.algorithm.commons import grad_norm, slice_segments
-from rvc.lib.algorithm.discriminators import MultiPeriodDiscriminator
+from rvc.lib.algorithm.discriminator import MultiPeriodDiscriminator
 from rvc.lib.algorithm.synthesizers import Synthesizer
 from rvc.train.extract.extract_model import extract_model
 from rvc.train.losses import discriminator_loss, feature_loss, generator_loss, kl_loss
