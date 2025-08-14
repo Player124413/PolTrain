@@ -21,3 +21,4 @@ torchvision==0.22.1
 faiss-cpu==1.10.0
 transformers==4.44.2
 triton==3.2.0
+ring-attention-pytorch @ https://github.com/codename0og/codename-essentials/raw/refs/heads/main/ring_attention_pytorch-0.5.17-py3-none-any.whl
