@@ -7,9 +7,21 @@ from torch.nn.utils.parametrizations import weight_norm
 
 from rvc.lib.algorithm.commons import get_padding, init_weights
 from rvc.lib.algorithm.modules import WaveNet
+from rvc.lib.algorithm.conformer.snake_fused_triton import Snake # Fused Triton variant
+from rvc.lib.algorithm.conformer.activations import SnakeBeta
 
 LRELU_SLOPE = 0.1
 
+class Swish(torch.nn.Module):
+    def __init__(self, beta=1.0, learnable=True):
+        super().__init__()
+        if learnable:
+            self.beta = torch.nn.Parameter(torch.tensor(beta))
+        else:
+            self.register_buffer("beta", torch.tensor(beta))
+
+    def forward(self, x):
+        return x * torch.sigmoid(self.beta * x)
 
 def create_conv1d_layer(channels, kernel_size, dilation):
     return weight_norm(
