@@ -104,3 +104,7 @@ class HParams:
 
     def __repr__(self):
         return repr(self.__dict__)
+class AttrDict(dict):
+    def __init__(self, *args, **kwargs):
+        super(AttrDict, self).__init__(*args, **kwargs)
+        self.__dict__ = self
