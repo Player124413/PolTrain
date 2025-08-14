@@ -15,9 +15,10 @@ matplotlib==3.10.1
 matplotlib-inline==0.1.7
 
 # Машинное обучение
-torch==2.7.1
-torchaudio==2.7.1
-torchvision==0.22.1
+torch==2.6.0
+torchaudio==2.6.0
+torchvision==0.21.0
+torchcrepe==0.0.23
 faiss-cpu==1.10.0
 transformers==4.44.2
 triton==3.2.0
