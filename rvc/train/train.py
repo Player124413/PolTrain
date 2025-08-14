@@ -63,7 +63,7 @@ def get_hparams():
     parser.add_argument("--save_every_epoch", type=int, choices=range(1, 101), default=25)
     parser.add_argument("--batch_size", type=int, choices=range(1, 51), default=8)
     parser.add_argument("--sample_rate", type=int, choices=[32000, 40000, 48000], default=40000)
-    parser.add_argument("--vocoder", type=str, choices=["HiFi-GAN", "MRF HiFi-GAN", "RefineGAN"], default="HiFi-GAN")
+    parser.add_argument("--vocoder", type=str, choices=["HiFi-GAN", "MRF HiFi-GAN", "RefineGAN", "RingFormer"], default="HiFi-GAN")
     parser.add_argument("--pretrain_g", type=str, default=None)
     parser.add_argument("--pretrain_d", type=str, default=None)
     parser.add_argument("--gpus", type=str, default="0")
