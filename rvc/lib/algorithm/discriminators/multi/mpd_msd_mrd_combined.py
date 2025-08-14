@@ -12,7 +12,7 @@ import typing
 from typing import Optional, List, Union, Dict, Tuple
 
 from torch.utils.checkpoint import checkpoint
-from rvc.train.utils import AttrDict
+from rvc.train.utils.train_utils import AttrDict
 
 from rvc.lib.algorithm.commons import get_padding
 from rvc.lib.algorithm.residuals import LRELU_SLOPE
