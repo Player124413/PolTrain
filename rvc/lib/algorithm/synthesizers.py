@@ -58,8 +58,10 @@ class Synthesizer(torch.nn.Module):
         spk_embed_dim: int,
         gin_channels: int,
         sr: int,
-        text_enc_hidden_dim: int = 768,
+        text_enc_hidden_dim: int = 768
         vocoder: str = "HiFi-GAN",
+        gen_istft_n_fft: int = 120,
+        gen_istft_hop_size: int = 30,
         randomized: bool = True,
         checkpointing: bool = False,
         **kwargs,
