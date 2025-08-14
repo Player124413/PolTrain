@@ -8,8 +8,7 @@ from random import shuffle
 import numpy as np
 import soundfile as sf
 import torch
-from fairseq.checkpoint_utils import load_model_ensemble_and_task
-from fairseq.data.dictionary import Dictionary
+from transformers import HubertModel
 from tqdm import tqdm
 
 sys.path.append(os.getcwd())
@@ -20,7 +19,7 @@ from rvc.lib.rmvpe import RMVPE
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 logging.getLogger("numba").setLevel(logging.WARNING)
-logging.getLogger("fairseq").setLevel(logging.WARNING)
+logging.getLogger("transformers").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -30,7 +29,10 @@ sample_rate = int(sys.argv[3])  # Частота дискретизации
 include_mutes = int(sys.argv[4])  # Количество мьют файлов
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-
+class HubertModelWithFinalProj(HubertModel):
+    def __init__(self, config):
+        super().__init__(config)
+        self.final_proj = nn.Linear(config.hidden_size, config.classifier_proj_size)
 
 class DataPreprocessor:
     def __init__(self):
@@ -49,10 +51,8 @@ class DataPreprocessor:
 
     def _load_hubert_model(self):
         """Загрузка модели HuBERT"""
-        model_path = "assets/hubert/hubert_base.pt"
-        torch.serialization.add_safe_globals([Dictionary])
-        models, _, _ = load_model_ensemble_and_task([model_path], suffix="")
-        return models[0].to(device).eval()
+        model = HubertModelWithFinalProj.from_pretrained("assets/hubert").to(device).eval()
+        return model
 
     def compute_f0(self, path, f0_method):
         """Вычисление F0"""
