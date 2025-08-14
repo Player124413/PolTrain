@@ -187,7 +187,7 @@ def run(hps, rank, n_gpus, device, device_id):
         )
         # MPD + MSD + MRD
         from rvc.lib.algorithm.discriminators.multi.mpd_msd_mrd_combined import MPD_MSD_MRD_Combined
-        net_d = MPD_MSD_MRD_Combined(config.model.use_spectral_norm, checkpointing=False, **dict(config.mrd))
+        net_d = MPD_MSD_MRD_Combined(hps.model.use_spectral_norm, checkpointing=False, **dict(config.mrd))
 
         if device.type == "cuda":
             net_g = net_g.cuda(device_id)
