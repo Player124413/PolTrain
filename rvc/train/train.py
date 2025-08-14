@@ -188,7 +188,7 @@ def run(hps, rank, n_gpus, device, device_id):
         if vocoder == "RingFormer":
         # MPD + MSD + MRD
         from rvc.lib.algorithm.discriminators.multi.mpd_msd_mrd_combined import MPD_MSD_MRD_Combined
-        net_d = MPD_MSD_MRD_Combined(config.model.use_spectral_norm, use_checkpointing=use_checkpointing, **dict(config.mrd))
+        net_d = MPD_MSD_MRD_Combined(config.model.use_spectral_norm, checkpointing=False, **dict(config.mrd))
         else:
             net_d = MultiPeriodDiscriminator(hps.model.use_spectral_norm, checkpointing=False)
 
