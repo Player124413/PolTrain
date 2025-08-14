@@ -18,7 +18,7 @@ import numpy as np
 
 from rvc.lib.algorithm.residuals import ResBlock, ResBlock_Snake, ResBlock_Snake_Fused
 from rvc.lib.algorithm.conformer.conformer import Conformer
-
+from rvc.lib.algorithm.conformer.stft import TorchSTFT
 from rvc.lib.algorithm.commons import init_weights
 
 
