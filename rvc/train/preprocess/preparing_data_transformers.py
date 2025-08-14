@@ -85,11 +85,11 @@ class DataPreprocessor:
     def extract_features(self, wav_path):
         """Извлечение признаков HuBERT"""
         feats = self.read_wave(wav_path)
-        padding_mask = torch.BoolTensor(feats.shape).fill_(False)
 
         with torch.no_grad():
-            logits = self.hubert_model.extract_features(source=feats.to(device), padding_mask=padding_mask.to(device), output_layer=12)
-            return logits[0].squeeze(0).float().cpu().numpy()
+            output = self.hubert_model(input_values=feats.to(device))
+            return output.last_hidden_state.squeeze(0).float().cpu().numpy()
+
 
     def process_files(self):
         """Основной метод обработки файлов"""
