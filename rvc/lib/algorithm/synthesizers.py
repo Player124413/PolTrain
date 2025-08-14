@@ -67,7 +67,8 @@ class Synthesizer(torch.nn.Module):
         super().__init__()
         self.segment_size = segment_size
         self.randomized = randomized
-
+        self.gen_istft_n_fft = gen_istft_n_fft
+        self.gen_istft_hop_size = gen_istft_hop_size
         self.enc_p = TextEncoder(
             inter_channels,
             hidden_channels,
