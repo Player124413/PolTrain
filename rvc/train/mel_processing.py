@@ -20,7 +20,7 @@ def spectral_de_normalize_torch(magnitudes):
 
 
 mel_basis = {}
-hann_window = {}
+hann_window = torch.hann_window(hps.model.gen_istft_n_fft).to(device)
 
 
 def spectrogram_torch(y, n_fft, hop_size, win_size, center=False):
