@@ -188,7 +188,7 @@ class Synthesizer(torch.nn.Module):
                 return o, ids_slice, x_mask, y_mask, (z, z_p, m_p, logs_p, m_q, logs_q), (spec, phase)
             # future use for finetuning using the entire dataset each pass
             else:
-                 o, spec, phase = self.dec(z_slice, pitchf, g=g)
+                o, spec, phase = self.dec(z, pitchf, g=g)
                 return o, None, x_mask, y_mask, (z, z_p, m_p, logs_p, m_q, logs_q), (spec, phase)
         else:
             return None, None, x_mask, None, (None, None, m_p, logs_p, None, None)
