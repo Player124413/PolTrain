@@ -286,6 +286,8 @@ def train_and_evaluate(hps, rank, epoch, nets, optims, train_loader, writer_eval
     net_d.train()
 
     epoch_recorder = EpochRecorder()
+    mel_similarity = None  # Инициализация переменной
+    
     for _, info in enumerate(train_loader):
         if device.type == "cuda":
             info = [tensor.cuda(device_id, non_blocking=True) for tensor in info]
@@ -376,7 +378,8 @@ def train_and_evaluate(hps, rank, epoch, nets, optims, train_loader, writer_eval
             f"{epoch_recorder.record()} - {hps.model_name} | "
             f"Эпоха: {epoch}/{hps.total_epoch} | "
             f"Шаг: {global_step} | "
-            f"Сходство mel (G/R): {mel_similarity:.2f}%",
+            f"{f'Сходство mel (G/R): {mel_similarity:.2f}% | ' if mel_similarity is not None else ''}"
+            f"LR: {current_lr_g:.2e}",
             flush=True,
         )
 
