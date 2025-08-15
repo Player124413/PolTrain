@@ -195,7 +195,7 @@ def run(hps, rank, n_gpus, device, device_id):
         else:
             net_g = net_g.to(device)
             net_d = net_d.to(device)
-
+        hann_window = torch.hann_window(hps.model.gen_istft_n_fft).to(device)
         optim_g = torch.optim.AdamW(
             net_g.parameters(),
             hps.train.learning_rate,
