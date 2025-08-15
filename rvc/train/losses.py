@@ -1,5 +1,11 @@
 import torch
+from torch.nn import functional as F
+def phase_loss(x_fft: torch.Tensor, g_fft: torch.Tensor, reduction: str = 'mean') -> torch.Tensor:
+    x_norm = x_fft / (x_fft.abs() + 1e-9)
+    g_norm = g_fft / (g_fft.abs() + 1e-9)
 
+    phase_similarity = (x_norm * g_norm.conj()).real
+    loss = 1.0 - phase_similarity
 
 def feature_loss(fmap_r, fmap_g):
     return 2 * sum(torch.mean(torch.abs(rl - gl)) for dr, dg in zip(fmap_r, fmap_g) for rl, gl in zip(dr, dg))
