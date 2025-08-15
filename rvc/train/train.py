@@ -294,7 +294,7 @@ def train_and_evaluate(hps, rank, epoch, nets, optims, train_loader, writer_eval
 
         phone, phone_lengths, pitch, pitchf, spec, spec_lengths, wave, _, sid = info
         model_output = net_g(phone, phone_lengths, pitch, pitchf, spec, spec_lengths, sid)
-        y_hat, ids_slice, x_mask, z_mask, (z, z_p, m_p, logs_p, m_q, logs_q), (mag, phase) = (model_output)
+        y_hat, ids_slice, _, z_mask, (_, z_p, m_p, logs_p, _, logs_q), (mag, phase) = model_output
         wave = slice_segments(wave, ids_slice * hps.data.hop_length, hps.train.segment_size, dim=3)
 
         # Discriminator loss
