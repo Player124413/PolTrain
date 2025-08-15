@@ -185,13 +185,13 @@ class Synthesizer(torch.nn.Module):
                 z_slice, ids_slice = rand_slice_segments(z, y_lengths, self.segment_size)
                 pitchf = slice_segments(pitchf, ids_slice, self.segment_size, 2)
                 o, spec, phase = self.dec(z_slice, pitchf, g=g)
-                return o, ids_slice, x_mask, y_mask, (z, z_p, m_p, logs_p, m_q, logs_q)
+                return o, ids_slice, x_mask, y_mask, (z, z_p, m_p, logs_p, m_q, logs_q), (spec, phase)
             # future use for finetuning using the entire dataset each pass
             else:
                  o, spec, phase = self.dec(z_slice, pitchf, g=g)
                 return o, None, x_mask, y_mask, (z, z_p, m_p, logs_p, m_q, logs_q), (spec, phase)
         else:
-            return None, None, x_mask, None, (None, None, m_p, logs_p, None, None), (spec, phase)
+            return None, None, x_mask, None, (None, None, m_p, logs_p, None, None)
 
     @torch.jit.export
     def infer(
