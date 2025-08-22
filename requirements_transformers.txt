@@ -1,0 +1,25 @@
+# общее
+wget
+numpy==1.26.4
+
+# Звук
+pydub==0.25.1
+librosa==0.11.0
+ffmpeg-python==0.2.0
+
+# Визуализация
+tqdm
+tensorboard
+tensorboardX
+matplotlib==3.10.1
+matplotlib-inline==0.1.7
+
+# Машинное обучение
+torch==2.6.0
+torchaudio==2.6.0
+torchvision==0.21.0
+torchcrepe==0.0.23
+faiss-cpu==1.10.0
+transformers==4.44.2
+triton==3.2.0
+ring-attention-pytorch @ https://github.com/codename0og/codename-essentials/raw/refs/heads/main/ring_attention_pytorch-0.5.17-py3-none-any.whl
