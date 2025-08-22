@@ -5,6 +5,12 @@ import traceback
 import warnings
 from random import shuffle
 
+# Установка переменных окружения и отключение предупреждений
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+logging.basicConfig(level=logging.WARNING)
+warnings.filterwarnings("ignore")
+
 import numpy as np
 import soundfile as sf
 import torch
@@ -17,23 +23,16 @@ sys.path.append(os.getcwd())
 from rvc.lib.audio import load_audio
 from rvc.lib.rmvpe import RMVPE
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-logging.getLogger("numba").setLevel(logging.WARNING)
-logging.getLogger("fairseq").setLevel(logging.WARNING)
-warnings.filterwarnings("ignore", category=FutureWarning)
-warnings.filterwarnings("ignore", category=UserWarning)
-
 exp_dir = str(sys.argv[1])  # Директория с данными
 f0_method = str(sys.argv[2])  # Метод извлечения F0
 sample_rate = int(sys.argv[3])  # Частота дискретизации
 include_mutes = int(sys.argv[4])  # Количество мьют файлов
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
 
 class DataPreprocessor:
     def __init__(self):
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
         # Настройки для F0
         self.sample_rate = 16000
         self.hop_size = 160
@@ -52,7 +51,7 @@ class DataPreprocessor:
         model_path = "assets/hubert/hubert_base.pt"
         torch.serialization.add_safe_globals([Dictionary])
         models, _, _ = load_model_ensemble_and_task([model_path], suffix="")
-        return models[0].to(device).eval()
+        return models[0].to(self.device).eval()
 
     def compute_f0(self, path, f0_method):
         """Вычисление F0"""
@@ -84,11 +83,11 @@ class DataPreprocessor:
 
     def extract_features(self, wav_path):
         """Извлечение признаков HuBERT"""
-        feats = self.read_wave(wav_path)
-        padding_mask = torch.BoolTensor(feats.shape).fill_(False)
+        feats = self.read_wave(wav_path).to(self.device)
+        padding_mask = torch.BoolTensor(feats.shape).fill_(False).to(self.device)
 
         with torch.no_grad():
-            logits = self.hubert_model.extract_features(source=feats.to(device), padding_mask=padding_mask.to(device), output_layer=12)
+            logits = self.hubert_model.extract_features(source=feats, padding_mask=padding_mask, output_layer=12)
             return logits[0].squeeze(0).float().cpu().numpy()
 
     def process_files(self):
@@ -108,7 +107,7 @@ class DataPreprocessor:
         if not files:
             self._raise_no_files_error()
 
-        print(f"\nФрагментов, готовых к обработке - {len(files)}")
+        print(f"\nДанных, готовых к обработке - {len(files)}")
 
         # Обработка файлов
         for file in tqdm(files, desc="Извлечение тона"):
