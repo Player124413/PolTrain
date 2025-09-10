@@ -73,7 +73,7 @@ class DataPreprocessor:
                 fs=self.sample_rate,
                 f0_ceil=self.f0_max,
                 f0_floor=self.f0_min,
-                frame_period=1000 * self.hop_length / self.sample_rate,
+                frame_period=1000 * self.hop_size / self.sample_rate,
             )
             f0 = pyworld.stonemask(audio.astype(np.double), f0, t, self.sample_rate)
         elif f0_method == "rmvpe+":
