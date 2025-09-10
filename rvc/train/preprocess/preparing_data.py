@@ -65,6 +65,16 @@ class DataPreprocessor:
     def compute_f0(self, path, f0_method):
         """Вычисление F0"""
         audio = load_audio(path, self.sample_rate)
+        if f0_method == "harvest":
+            f0, t = pyworld.harvest(
+                audio.astype(np.double),
+                fs=self.sample_rate,
+                f0_ceil=self.f0_max,
+                f0_floor=self.f0_min,
+                frame_period=1000 * self.hop_size / self.sample_rate,
+            )
+            f0 = pyworld.stonemask(audio.astype(np.double), f0, t, self.sample_rate)
+
         if f0_method == "rmvpe":
             return self.model_rmvpe.infer_from_audio(audio, 0.03)
         elif f0_method == "rmvpe+":
