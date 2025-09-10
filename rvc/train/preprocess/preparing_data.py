@@ -136,9 +136,17 @@ class DataPreprocessor:
 
                 if not (os.path.exists(opt_path1 + ".npy") and os.path.exists(opt_path2 + ".npy")):
                     featur_pit = self.compute_f0(inp_path, f0_method)
-                    np.save(opt_path2, featur_pit, allow_pickle=False)
+                    
+                    if f0_method == "harvest":
+                       np.save(opt_path2, featur_pit, allow_pickle=True)
+                    else:
+                        np.save(opt_path2, featur_pit, allow_pickle=False)
                     coarse_pit = self.coarse_f0(featur_pit)
-                    np.save(opt_path1, coarse_pit, allow_pickle=False)
+                    if f0_method == "harvest":
+                       np.save(opt_path1, coarse_pit, allow_pickle=True)
+                    else:
+                        np.save(opt_path1, coarse_pit, allow_pickle=False)
+                    
             except:
                 raise RuntimeError(f"Ошибка извлечения тона!\nФайл - {inp_path}\n{traceback.format_exc()}")
 
