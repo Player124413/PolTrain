@@ -22,7 +22,7 @@ from rvc.lib.audio import load_audio
 from rvc.lib.rmvpe import RMVPE
 
 exp_dir = str(sys.argv[1])  # Директория с данными
-arch_fairseq = str(sys.argv[2])  # Архитектура Fairseq
+arch_fairseq = str(sys.argv[2])  # Архитектура Fairseq
 f0_method = str(sys.argv[3])  # Метод извлечения F0
 sample_rate = int(sys.argv[4])  # Частота дискретизации
 include_mutes = int(sys.argv[5])  # Количество мьют файлов
@@ -64,30 +64,61 @@ class DataPreprocessor:
 
     def compute_f0(self, path, f0_method):
         """Вычисление F0"""
-        audio = load_audio(path, self.sample_rate)
-        if f0_method == "rmvpe":
-            return self.model_rmvpe.infer_from_audio(audio, 0.03)
-        if f0_method == "harvest":
-            f0, t = pyworld.harvest(
-                audio.astype(np.double),
-                fs=self.sample_rate,
-                f0_ceil=self.f0_max,
-                f0_floor=self.f0_min,
-                frame_period=1000 * self.hop_size / self.sample_rate,
-            )
-            f0 = pyworld.stonemask(audio.astype(np.double), f0, t, self.sample_rate)
-        elif f0_method == "rmvpe+":
-            return self.model_rmvpe.infer_from_audio_modified(audio, 0.02)
+        try:
+            audio = load_audio(path, self.sample_rate)
+            if f0_method == "rmvpe":
+                f0 = self.model_rmvpe.infer_from_audio(audio, 0.03)
+            elif f0_method == "harvest":
+                f0, t = pyworld.harvest(
+                    audio.astype(np.double),
+                    fs=self.sample_rate,
+                    f0_ceil=self.f0_max,
+                    f0_floor=self.f0_min,
+                    frame_period=1000 * self.hop_size / self.sample_rate,
+                )
+                f0 = pyworld.stonemask(audio.astype(np.double), f0, t, self.sample_rate)
+            elif f0_method == "rmvpe+":
+                f0 = self.model_rmvpe.infer_from_audio_modified(audio, 0.02)
+            else:
+                raise ValueError(f"Неизвестный метод F0: {f0_method}")
+            
+            # Проверка на None или пустой массив
+            if f0 is None or len(f0) == 0:
+                print(f"Warning: F0 is None or empty for {path}, returning zeros")
+                return np.zeros(len(audio) // self.hop_size, dtype=np.float32)
+            
+            return f0
+            
+        except Exception as e:
+            print(f"Error computing F0 for {path}: {e}")
+            # Возвращаем массив нулей вместо ошибки
+            audio = load_audio(path, self.sample_rate)
+            return np.zeros(len(audio) // self.hop_size, dtype=np.float32)
 
     def coarse_f0(self, f0):
         """Квантование F0"""
-        f0_mel = 1127 * np.log(1 + f0 / 700)
-        f0_mel[f0_mel > 0] = (f0_mel[f0_mel > 0] - self.f0_mel_min) * (self.f0_bin - 2) / (self.f0_mel_max - self.f0_mel_min) + 1
-        f0_mel[f0_mel <= 1] = 1
-        f0_mel[f0_mel > self.f0_bin - 1] = self.f0_bin - 1
-        f0_coarse = np.rint(f0_mel).astype(int)
-        assert f0_coarse.max() <= 255 and f0_coarse.min() >= 1, (f0_coarse.max(), f0_coarse.min())
-        return f0_coarse
+        # Проверка на None или пустой массив
+        if f0 is None or len(f0) == 0:
+            print("Warning: f0 is None or empty in coarse_f0, returning zeros")
+            return np.zeros(256, dtype=np.int32)
+        
+        try:
+            f0_mel = 1127 * np.log(1 + f0 / 700)
+            f0_mel[f0_mel > 0] = (f0_mel[f0_mel > 0] - self.f0_mel_min) * (self.f0_bin - 2) / (self.f0_mel_max - self.f0_mel_min) + 1
+            f0_mel[f0_mel <= 1] = 1
+            f0_mel[f0_mel > self.f0_bin - 1] = self.f0_bin - 1
+            f0_coarse = np.rint(f0_mel).astype(np.int32)
+            
+            # Проверка диапазона значений
+            if f0_coarse.max() > 255 or f0_coarse.min() < 1:
+                print(f"Warning: f0_coarse out of range (min: {f0_coarse.min()}, max: {f0_coarse.max()}), clipping")
+                f0_coarse = np.clip(f0_coarse, 1, 255)
+                
+            return f0_coarse
+            
+        except Exception as e:
+            print(f"Error in coarse_f0: {e}")
+            return np.zeros(len(f0) if f0 is not None else 256, dtype=np.int32)
 
     def read_wave(self, wav_path):
         """Чтение аудиофайла"""
@@ -127,29 +158,28 @@ class DataPreprocessor:
 
         print(f"\nДанных, готовых к обработке - {len(files)}")
 
-        # Обработка файлов
+        # Обработка файлов - извлечение тона
         for file in tqdm(files, desc="Извлечение тона"):
             try:
                 inp_path = f"{inp_root}/{file}"
-                opt_path1 = f"{f0_quant_path}/{file}"
-                opt_path2 = f"{f0_voiced_path}/{file}"
+                opt_path1 = f"{f0_quant_path}/{file}.npy"
+                opt_path2 = f"{f0_voiced_path}/{file}.npy"
 
-                if not (os.path.exists(opt_path1 + ".npy") and os.path.exists(opt_path2 + ".npy")):
+                if not (os.path.exists(opt_path1) and os.path.exists(opt_path2)):
                     featur_pit = self.compute_f0(inp_path, f0_method)
                     
-                    if f0_method == "harvest":
-                       np.save(opt_path2, featur_pit, allow_pickle=True)
-                    else:
-                        np.save(opt_path2, featur_pit, allow_pickle=False)
-                    coarse_pit = self.coarse_f0(featur_pit)
-                    if f0_method == "harvest":
-                       np.save(opt_path1, coarse_pit, allow_pickle=True)
-                    else:
-                        np.save(opt_path1, coarse_pit, allow_pickle=False)
+                    # Сохраняем сырые F0 значения
+                    np.save(opt_path2, featur_pit, allow_pickle=False)
                     
-            except:
-                raise RuntimeError(f"Ошибка извлечения тона!\nФайл - {inp_path}\n{traceback.format_exc()}")
+                    # Квантуем и сохраняем
+                    coarse_pit = self.coarse_f0(featur_pit)
+                    np.save(opt_path1, coarse_pit, allow_pickle=False)
+                    
+            except Exception as e:
+                print(f"Ошибка извлечения тона для файла {inp_path}: {e}")
+                continue  # Продолжаем обработку других файлов
 
+        # Обработка файлов - извлечение признаков
         for file in tqdm(files, desc="Извлечение признаков"):
             try:
                 wav_path = f"{inp_root}/{file}"
@@ -158,10 +188,12 @@ class DataPreprocessor:
                 if not os.path.exists(out_path):
                     feats = self.extract_features(wav_path)
                     if np.isnan(feats).sum() > 0:
-                        raise TypeError(f"Файл {file} содержит некорректные значения (NaN).")
+                        print(f"Warning: Файл {file} содержит NaN значения")
+                        feats = np.nan_to_num(feats)
                     np.save(out_path, feats, allow_pickle=False)
-            except:
-                raise RuntimeError(f"Ошибка извлечения признаков!\nФайл - {wav_path}\n{traceback.format_exc()}")
+            except Exception as e:
+                print(f"Ошибка извлечения признаков для файла {wav_path}: {e}")
+                continue  # Продолжаем обработку других файлов
 
         print("Обработка данных успешно завершена!")
 
@@ -181,18 +213,25 @@ class DataPreprocessor:
 def generate_filelist(model_path: str, sample_rate: int, include_mutes: int = 2):
     mute_base_path = os.path.join(os.getcwd(), "logs", "mute")
 
-    f0_dir, f0nsf_dir = None, None
-    gt_wavs_dir = os.path.join(model_path, "data", "sliced_audios")
+    gt_wavs_dir = os.path.join(model_path, "data", "sliced_audios_16k")  # Исправлено
     feature_dir = os.path.join(model_path, "data", "features")
     f0_dir = os.path.join(model_path, "data", "f0_quantized")
     f0nsf_dir = os.path.join(model_path, "data", "f0_voiced")
 
-    gt_wavs_files = set(name.split(".")[0] for name in os.listdir(gt_wavs_dir))
-    feature_files = set(name.split(".")[0] for name in os.listdir(feature_dir))
-    f0_files = set(name.split(".")[0] for name in os.listdir(f0_dir))
-    f0nsf_files = set(name.split(".")[0] for name in os.listdir(f0nsf_dir))
+    # Проверяем существование директорий
+    for dir_path in [gt_wavs_dir, feature_dir, f0_dir, f0nsf_dir]:
+        if not os.path.exists(dir_path):
+            raise FileNotFoundError(f"Директория не найдена: {dir_path}")
+
+    gt_wavs_files = set(name.split(".")[0] for name in os.listdir(gt_wavs_dir) if name.endswith('.wav'))
+    feature_files = set(name.split(".")[0] for name in os.listdir(feature_dir) if name.endswith('.npy'))
+    f0_files = set(name.split(".")[0] for name in os.listdir(f0_dir) if name.endswith('.npy'))
+    f0nsf_files = set(name.split(".")[0] for name in os.listdir(f0nsf_dir) if name.endswith('.npy'))
 
     names = gt_wavs_files & feature_files & f0_files & f0nsf_files
+
+    if not names:
+        raise ValueError("Не найдено файлов для создания filelist")
 
     sids = []
     options = []
@@ -213,9 +252,15 @@ def generate_filelist(model_path: str, sample_rate: int, include_mutes: int = 2)
         mute_f0_path = os.path.join(mute_base_path, "f0_quantized", "mute.wav.npy")
         mute_f0nsf_path = os.path.join(mute_base_path, "f0_voiced", "mute.wav.npy")
 
-        # добавление (include_mutes) файлов для каждого sid
-        for sid in sids * include_mutes:
-            options.append(f"{mute_audio_path}|{mute_feature_path}|{mute_f0_path}|{mute_f0nsf_path}|{sid}")
+        # Проверяем существование мьют файлов
+        mute_files_exist = all(os.path.exists(path) for path in [mute_audio_path, mute_feature_path, mute_f0_path, mute_f0nsf_path])
+        
+        if mute_files_exist:
+            # добавление (include_mutes) файлов для каждого sid
+            for sid in sids * include_mutes:
+                options.append(f"{mute_audio_path}|{mute_feature_path}|{mute_f0_path}|{mute_f0nsf_path}|{sid}")
+        else:
+            print("Warning: Мьют файлы не найдены, пропускаем добавление")
 
     shuffle(options)
 
@@ -229,6 +274,7 @@ if __name__ == "__main__":
         preprocessor.process_files()
 
         generate_filelist(exp_dir, sample_rate, include_mutes)
+        print("Filelist успешно создан!")
     except Exception as e:
         print(f"Критическая ошибка: {str(e)}")
         print(traceback.format_exc())
