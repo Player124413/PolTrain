@@ -14,8 +14,6 @@ warnings.filterwarnings("ignore")
 import numpy as np
 import soundfile as sf
 import torch
-from fairseq.checkpoint_utils import load_model_ensemble_and_task
-from fairseq.data.dictionary import Dictionary
 from tqdm import tqdm
 
 sys.path.append(os.getcwd())
@@ -24,9 +22,10 @@ from rvc.lib.audio import load_audio
 from rvc.lib.rmvpe import RMVPE
 
 exp_dir = str(sys.argv[1])  # Директория с данными
-f0_method = str(sys.argv[2])  # Метод извлечения F0
-sample_rate = int(sys.argv[3])  # Частота дискретизации
-include_mutes = int(sys.argv[4])  # Количество мьют файлов
+arch_fairseq = str(sys.argv[2])  # Архитектура Fairseq
+f0_method = str(sys.argv[3])  # Метод извлечения F0
+sample_rate = int(sys.argv[4])  # Частота дискретизации
+include_mutes = int(sys.argv[5])  # Количество мьют файлов
 
 
 class DataPreprocessor:
@@ -44,13 +43,23 @@ class DataPreprocessor:
 
         # Инициализация моделей
         self.model_rmvpe = RMVPE("assets/rmvpe/rmvpe.pt", "cuda")
-        self.hubert_model = self._load_hubert_model()
+
+        if arch_fairseq == "Fairseq":
+            self.hubert_model = self._load_hubert_model()
+        elif arch_fairseq == "Fairseq2":
+            from rvc.lib.fairseq import load_model
+            
+            self.hubert_model = load_model("assets/hubert/hubert_base.pt").to(self.device).eval()
+        else:
+            raise ValueError("Неизвестное значение для 'arch_fairseq'! Доступные варианты: 'Fairseq', 'Fairseq2'.")
 
     def _load_hubert_model(self):
         """Загрузка модели HuBERT"""
-        model_path = "assets/hubert/hubert_base.pt"
+        from fairseq.checkpoint_utils import load_model_ensemble_and_task
+        from fairseq.data.dictionary import Dictionary
+        
         torch.serialization.add_safe_globals([Dictionary])
-        models, _, _ = load_model_ensemble_and_task([model_path], suffix="")
+        models, _, _ = load_model_ensemble_and_task(["assets/hubert/hubert_base.pt"], suffix="")
         return models[0].to(self.device).eval()
 
     def compute_f0(self, path, f0_method):
