@@ -4,7 +4,7 @@ import sys
 import traceback
 import warnings
 from random import shuffle
-
+import pyworld
 # Установка переменных окружения и отключение предупреждений
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
