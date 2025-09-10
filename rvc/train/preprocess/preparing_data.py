@@ -67,6 +67,15 @@ class DataPreprocessor:
         audio = load_audio(path, self.sample_rate)
         if f0_method == "rmvpe":
             return self.model_rmvpe.infer_from_audio(audio, 0.03)
+        if f0_method == "harvest":
+            f0, t = pyworld.harvest(
+                x.astype(np.double),
+                fs=self.fs,
+                f0_ceil=self.f0_max,
+                f0_floor=self.f0_min,
+                frame_period=1000 * self.hop / self.fs,
+            )
+            f0 = pyworld.stonemask(x.astype(np.double), f0, t, self.fs)
         elif f0_method == "rmvpe+":
             return self.model_rmvpe.infer_from_audio_modified(audio, 0.02)
 
