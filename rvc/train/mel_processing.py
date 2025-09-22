@@ -3,22 +3,6 @@ import torch.utils.data
 from librosa.filters import mel as librosa_mel_fn
 
 
-def dynamic_range_compression_torch(x, C=1, clip_val=1e-5):
-    return torch.log(torch.clamp(x, min=clip_val) * C)
-
-
-def dynamic_range_decompression_torch(x, C=1):
-    return torch.exp(x) / C
-
-
-def spectral_normalize_torch(magnitudes):
-    return dynamic_range_compression_torch(magnitudes)
-
-
-def spectral_de_normalize_torch(magnitudes):
-    return dynamic_range_decompression_torch(magnitudes)
-
-
 mel_basis = {}
 hann_window = {}
 
@@ -57,7 +41,7 @@ def spec_to_mel_torch(spec, n_fft, num_mels, sample_rate, fmin, fmax):
         mel_basis[fmax_dtype_device] = torch.from_numpy(mel).to(dtype=spec.dtype, device=spec.device)
 
     melspec = torch.matmul(mel_basis[fmax_dtype_device], spec)
-    melspec = spectral_normalize_torch(melspec)
+    melspec = torch.log(melspec.clamp(min=1e-5) * 1)
     return melspec
 
 

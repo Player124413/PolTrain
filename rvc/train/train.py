@@ -317,10 +317,6 @@ def train_and_evaluate(hps, rank, epoch, nets, optims, train_loader, writer_eval
             grad_norm_g = grad_norm(net_g.parameters())
             optim_g.step()
 
-        # learning rates
-        current_lr_d = optim_d.param_groups[0]["lr"]
-        current_lr_g = optim_g.param_groups[0]["lr"]
-
         global_step += 1
 
     if rank == 0 and epoch % hps.train.log_interval == 0:
@@ -348,8 +344,6 @@ def train_and_evaluate(hps, rank, epoch, nets, optims, train_loader, writer_eval
         scalar_dict = {
             "grad/norm_d": grad_norm_d,
             "grad/norm_g": grad_norm_g,
-            "learning_rate/d": current_lr_d,
-            "learning_rate/g": current_lr_g,
             "loss/avg/d": loss_disc,
             "loss/avg/g": loss_gen,
             "loss/g/fm": loss_fm,

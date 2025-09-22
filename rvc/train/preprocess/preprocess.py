@@ -16,8 +16,8 @@ from rvc.train.preprocess.slicer import Slicer
 # Парсинг аргументов командной строки
 exp_dir = sys.argv[1]  # Директория для сохранения результатов
 input_root = sys.argv[2]  # Директория с входными аудиофайлами
-percentage = float(sys.argv[3])  # Длина сегмента в секундах
-sample_rate = int(sys.argv[4])  # Частота дискретизации
+percentage = float(sys.argv[3])  # Максимальная длина сегмента в секундах / По умолчанию = 3.0 (от n до 3сек)
+sample_rate = int(sys.argv[4])  # Частота дискретизации в которую преобразуются данные / 32000, 40000 и 48000
 normalize = sys.argv[5] == "True"  # Флаг для включения/выключения нормализации
 num_processes = max(1, os.cpu_count() - 1)  # Количество процессов
 
