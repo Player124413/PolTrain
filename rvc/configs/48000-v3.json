@@ -77,5 +77,6 @@
     "gin_channels": 256,
     "emb_channels": 768,
     "spk_embed_dim": 109
+    "vocoder": "HiFi-GAN"
   }
 }
