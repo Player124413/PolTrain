@@ -101,6 +101,20 @@ class Synthesizer(torch.nn.Module):
                 num_mels=inter_channels,
                 checkpointing=checkpointing,
             )
+        elif vocoder == "BigVGAN":
+            self.dec = BigVGANGenerator(
+                self,
+                in_channel=inter_channels,
+                upsample_initial_channel=upsample_initial_channel,
+                upsample_rates=upsample_rates,
+                upsample_kernel_sizes=upsample_kernel_sizes,
+                resblock_kernel_sizes=resblock_kernel_sizes,
+                resblock_dilations=resblock_dilation_sizes,
+                gin_channels=gin_channels,
+                sample_rate=sr,
+                harmonic_num,
+                checkpointing=checkpointing,
+            )     
         else:
             self.dec = HiFiGANNSFGenerator(
                 inter_channels,
