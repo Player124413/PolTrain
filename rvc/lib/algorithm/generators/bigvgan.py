@@ -316,6 +316,7 @@ class BigVGANGenerator(nn.Module):
         resblock_kernel_sizes,
         resblock_dilations,
         gin_channels,
+        checkpointing: bool = False,
         sample_rate,
         harmonic_num,
     ):
