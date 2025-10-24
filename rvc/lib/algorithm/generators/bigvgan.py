@@ -306,7 +306,7 @@ class SourceModuleHnNSF(torch.nn.Module):
 
         return sine_merge, None, None
 
-class BigVGAN(nn.Module):
+class BigVGANGenerator(nn.Module):
     def __init__(
         self,
         in_channel,
