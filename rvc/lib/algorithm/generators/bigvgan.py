@@ -317,7 +317,7 @@ class BigVGANGenerator(nn.Module):
         resblock_dilations,
         gin_channels,
         checkpointing: bool = False,
-        sample_rate,
+        sample_rate: int = 40000,
         harmonic_num,
     ):
         super().__init__()
