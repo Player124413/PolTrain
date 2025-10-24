@@ -114,7 +114,7 @@ class Synthesizer(torch.nn.Module):
                 sample_rate=sr,
                 harmonic_num,
                 checkpointing=checkpointing,
-            )     
+           )     
         else:
             self.dec = HiFiGANNSFGenerator(
                 inter_channels,
