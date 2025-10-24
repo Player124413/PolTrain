@@ -8,7 +8,7 @@ from rvc.lib.algorithm.generators.hifigan_mrf import HiFiGANMRFGenerator
 from rvc.lib.algorithm.generators.hifigan_nsf import HiFiGANNSFGenerator
 from rvc.lib.algorithm.generators.refinegan import RefineGANGenerator
 from rvc.lib.algorithm.residuals import ResidualCouplingBlock
-
+from rvc.lib.algorithm.generators.bigvgan import BIGVGANGenerator
 
 class Synthesizer(torch.nn.Module):
     """
