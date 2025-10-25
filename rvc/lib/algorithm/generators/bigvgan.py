@@ -334,6 +334,14 @@ class BigVGANGenerator(nn.Module):
         )
         self.upsamples = nn.ModuleList()
         self.noise_convs = nn.ModuleList()
+        
+        # Вычисляем stride_f0s на основе upsample_rates
+        stride_f0s = []
+        current_stride = 1
+        for u in upsample_rates:
+            current_stride *= u
+            stride_f0s.append(current_stride)
+        
         for i, (u, k) in enumerate(zip(upsample_rates, upsample_kernel_sizes)):
             # handling odd upsampling rates
             if u % 2 == 0:
@@ -354,22 +362,8 @@ class BigVGANGenerator(nn.Module):
                     )
                 )
             )
-            """ handling odd upsampling rates
-            #  s   k   p
-            # 40  80  20
-            # 32  64  16
-            #  4   8   2
-            #  2   3   1
-            # 63 125  31
-            #  9  17   4
-            #  3   5   1
-            #  1   1   0
-            """
-            stride_f0s = []
-            current_stride = 1
-            for u in upsample_rates:
-                current_stride *= u
-                stride_f0s.append(current_stride)
+            
+            stride = stride_f0s[i]
             kernel = (1 if stride == 1 else stride * 2 - stride % 2)
             padding = (0 if stride == 1 else (kernel - stride) // 2)
             
