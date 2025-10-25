@@ -365,7 +365,7 @@ class BigVGANGenerator(nn.Module):
             #  3   5   1
             #  1   1   0
             """
-            stride = stride_f0s[i]
+            stride_f0 = np.prod(upsample_rates[i + 1 :])
             kernel = (1 if stride == 1 else stride * 2 - stride % 2)
             padding = (0 if stride == 1 else (kernel - stride) // 2)
             
