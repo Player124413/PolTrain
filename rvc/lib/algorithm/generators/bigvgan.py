@@ -338,6 +338,7 @@ class BigVGANGenerator(nn.Module):
         
         # Правильный расчет stride_f0s для совместимости с чекпоинтом
         # Используем те же значения, что и в оригинальной обученной модели
+        stride_f0s = [1, 1, 1, 1]
         for i, (u, k) in enumerate(zip(upsample_rates, upsample_kernel_sizes)):
             # handling odd upsampling rates
             if u % 2 == 0:
