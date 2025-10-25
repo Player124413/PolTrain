@@ -323,7 +323,6 @@ class BigVGANGenerator(nn.Module):
         super().__init__()
         print("BigV")
         self.num_kernels = len(resblock_kernel_sizes)
-        self.upsample_rates = upsample_rates
 
         self.f0_upsample = nn.Upsample(scale_factor=np.prod(upsample_rates))
         self.m_source = SourceModuleHnNSF(sample_rate, harmonic_num)
@@ -335,11 +334,19 @@ class BigVGANGenerator(nn.Module):
         )
         self.upsamples = nn.ModuleList()
         self.noise_convs = nn.ModuleList()
-        stride_f0s = [1, 1, 1, 1]
+        
+        # Исправленный расчет stride_f0s
+        # Используем те же значения, что и в оригинальной реализации
+        stride_f0s = [1, 1, 1, 1]  # Стандартные значения для совместимости
+        
         for i, (u, k) in enumerate(zip(upsample_rates, upsample_kernel_sizes)):
-            # Более точный расчет padding для избежания несовпадения размеров
-            output_padding = (u - (k % u)) % u
-            
+            # handling odd upsampling rates
+            if u % 2 == 0:
+                # old method
+                padding = (k - u) // 2
+            else:
+                padding = u // 2 + u % 2
+                
             self.upsamples.append(
                 weight_norm(
                     nn.ConvTranspose1d(
@@ -347,16 +354,34 @@ class BigVGANGenerator(nn.Module):
                         upsample_initial_channel // (2 ** (i + 1)),
                         kernel_size=k,
                         stride=u,
-                        padding=(k - u) // 2,
-                        output_padding=output_padding,
+                        padding=padding,
+                        output_padding=u % 2,
                     )
                 )
             )
             
-            # Используем простые значения для noise_convs
-            kernel_size = 1
-            stride = 1
-            padding = 0
+            # Используем фиксированные значения для совместимости с чекпоинтом
+            if i == 0:
+                kernel_size = 80
+                stride = 1
+                padding = 0
+            elif i == 1:
+                kernel_size = 8
+                stride = 1
+                padding = 0
+            elif i == 2:
+                kernel_size = 4
+                stride = 1
+                padding = 0
+            elif i == 3:
+                kernel_size = 1
+                stride = 1
+                padding = 0
+            else:
+                # Для других случаев используем расчет по умолчанию
+                stride = 1
+                kernel_size = (1 if stride == 1 else stride * 2 - stride % 2)
+                padding = (0 if stride == 1 else (kernel_size - stride) // 2)
             
             self.noise_convs.append(
                 nn.Conv1d(
@@ -388,9 +413,8 @@ class BigVGANGenerator(nn.Module):
             self.cond = torch.nn.Conv1d(gin_channels, upsample_initial_channel, 1)
 
     def forward(self, x, f0, g: Optional[torch.Tensor] = None):
-        # Апсемплим f0 до нужного размера
-        f0_upsampled = self.f0_upsample(f0[:, None, :])
-        har_source, _, _ = self.m_source(f0_upsampled.transpose(-1, -2))
+        f0 = self.f0_upsample(f0[:, None, :]).transpose(-1, -2)
+        har_source, _, _ = self.m_source(f0)
         har_source = har_source.transpose(-1, -2)
 
         x = self.conv_pre(x)
@@ -398,49 +422,14 @@ class BigVGANGenerator(nn.Module):
         if g is not None:
             x = x + self.cond(g)  
         
-        for i, (up, amp, noise_conv) in enumerate(zip(self.upsamples, self.amps, self.noise_convs)):
-            # Сохраняем исходный размер для проверки
-            input_length = x.size(2)
-            
+        for up, amp, noise_conv in zip(self.upsamples, self.amps, self.noise_convs):
             x = up(x)
-            
-            # Вычисляем ожидаемый размер после апсемплинга
-            expected_length = input_length * self.upsample_rates[i]
-            
-            # Если размер не совпадает, корректируем
-            if x.size(2) != expected_length:
-                x = F.interpolate(x, size=expected_length, mode='linear', align_corners=False)
-            
-            # Для noise_conv используем простую стратегию - берем центральную часть
-            target_length = x.size(2)
-            if har_source.size(2) > target_length:
-                # Обрезаем до нужного размера
-                start = (har_source.size(2) - target_length) // 2
-                har_source_cropped = har_source[:, :, start:start + target_length]
-            elif har_source.size(2) < target_length:
-                # Паддим до нужного размера
-                pad_left = (target_length - har_source.size(2)) // 2
-                pad_right = target_length - har_source.size(2) - pad_left
-                har_source_cropped = F.pad(har_source, (pad_left, pad_right), mode='replicate')
-            else:
-                har_source_cropped = har_source
-            
-            x_source = noise_conv(har_source_cropped)
-            
-            # Финальная проверка и обрезка
-            min_length = min(x.size(2), x_source.size(2))
-            if min_length < x.size(2):
-                x = x[:, :, :min_length]
-            if min_length < x_source.size(2):
-                x_source = x_source[:, :, :min_length]
-            
+            x_source = noise_conv(har_source)
             x = x + x_source
-            
             xs = 0
             for layer in amp:
                 xs += layer(x)
             x = xs / self.num_kernels
-        
         x = self.act_post(x)
         x = self.conv_post(x)
         x = torch.tanh(x)
