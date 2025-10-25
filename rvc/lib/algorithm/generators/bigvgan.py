@@ -318,7 +318,7 @@ class BigVGANGenerator(nn.Module):
         gin_channels,
         checkpointing: bool = False,
         sample_rate: int = 40000,
-        harmonic_num: int,
+        harmonic_num: int = 0,
     ):
         super().__init__()
         print("BigV")
