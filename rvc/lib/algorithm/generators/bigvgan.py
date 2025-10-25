@@ -323,6 +323,7 @@ class BigVGANGenerator(nn.Module):
         super().__init__()
         print("BigV")
         self.num_kernels = len(resblock_kernel_sizes)
+        self.upsample_rates = upsample_rates
 
         self.f0_upsample = nn.Upsample(scale_factor=np.prod(upsample_rates))
         self.m_source = SourceModuleHnNSF(sample_rate, harmonic_num)
@@ -335,10 +336,8 @@ class BigVGANGenerator(nn.Module):
         self.upsamples = nn.ModuleList()
         self.noise_convs = nn.ModuleList()
         
-        # Исправленный расчет stride_f0s
-        # Используем те же значения, что и в оригинальной реализации
-        stride_f0s = [1, 1, 1, 1]  # Стандартные значения для совместимости
-        
+        # Правильный расчет stride_f0s для совместимости с чекпоинтом
+        # Используем те же значения, что и в оригинальной обученной модели
         for i, (u, k) in enumerate(zip(upsample_rates, upsample_kernel_sizes)):
             # handling odd upsampling rates
             if u % 2 == 0:
@@ -360,28 +359,26 @@ class BigVGANGenerator(nn.Module):
                 )
             )
             
-            # Используем фиксированные значения для совместимости с чекпоинтом
+            # Используем правильные kernel_size для совместимости
+            # Эти значения должны соответствовать чекпоинту
             if i == 0:
                 kernel_size = 80
                 stride = 1
-                padding = 0
             elif i == 1:
                 kernel_size = 8
                 stride = 1
-                padding = 0
             elif i == 2:
                 kernel_size = 4
                 stride = 1
-                padding = 0
             elif i == 3:
                 kernel_size = 1
                 stride = 1
-                padding = 0
             else:
-                # Для других случаев используем расчет по умолчанию
+                kernel_size = 1
                 stride = 1
-                kernel_size = (1 if stride == 1 else stride * 2 - stride % 2)
-                padding = (0 if stride == 1 else (kernel_size - stride) // 2)
+            
+            # Рассчитываем padding для выравнивания размеров
+            padding = (kernel_size - stride) // 2
             
             self.noise_convs.append(
                 nn.Conv1d(
@@ -413,8 +410,9 @@ class BigVGANGenerator(nn.Module):
             self.cond = torch.nn.Conv1d(gin_channels, upsample_initial_channel, 1)
 
     def forward(self, x, f0, g: Optional[torch.Tensor] = None):
-        f0 = self.f0_upsample(f0[:, None, :]).transpose(-1, -2)
-        har_source, _, _ = self.m_source(f0)
+        # Апсемплим f0 до нужного размера
+        f0_upsampled = self.f0_upsample(f0[:, None, :])
+        har_source, _, _ = self.m_source(f0_upsampled.transpose(-1, -2))
         har_source = har_source.transpose(-1, -2)
 
         x = self.conv_pre(x)
@@ -422,14 +420,37 @@ class BigVGANGenerator(nn.Module):
         if g is not None:
             x = x + self.cond(g)  
         
-        for up, amp, noise_conv in zip(self.upsamples, self.amps, self.noise_convs):
+        for i, (up, amp, noise_conv) in enumerate(zip(self.upsamples, self.amps, self.noise_convs)):
             x = up(x)
-            x_source = noise_conv(har_source)
+            
+            # Выравниваем размер har_source с x
+            target_length = x.size(2)
+            if har_source.size(2) != target_length:
+                # Используем интерполяцию для выравнивания размеров
+                har_source_resized = F.interpolate(
+                    har_source, 
+                    size=target_length, 
+                    mode='linear', 
+                    align_corners=False
+                )
+            else:
+                har_source_resized = har_source
+            
+            x_source = noise_conv(har_source_resized)
+            
+            # Проверяем размеры перед сложением
+            if x.size(2) != x_source.size(2):
+                # Если все еще не совпадают, обрезаем до минимального размера
+                min_length = min(x.size(2), x_source.size(2))
+                x = x[:, :, :min_length]
+                x_source = x_source[:, :, :min_length]
+            
             x = x + x_source
             xs = 0
             for layer in amp:
                 xs += layer(x)
             x = xs / self.num_kernels
+        
         x = self.act_post(x)
         x = self.conv_post(x)
         x = torch.tanh(x)
