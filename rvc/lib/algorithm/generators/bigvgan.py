@@ -335,7 +335,7 @@ class BigVGANGenerator(nn.Module):
         )
         self.upsamples = nn.ModuleList()
         self.noise_convs = nn.ModuleList()
-        
+        stride_f0s = [1, 1, 1, 1]
         for i, (u, k) in enumerate(zip(upsample_rates, upsample_kernel_sizes)):
             # Более точный расчет padding для избежания несовпадения размеров
             output_padding = (u - (k % u)) % u
